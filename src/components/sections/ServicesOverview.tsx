@@ -28,7 +28,7 @@ export function ServicesOverview() {
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {homeServices.map((s, i) => (
-            <Reveal key={s.title} delay={(i % 3) * 0.1}>
+            <Reveal key={s.title} delay={(i % 3) * 0.1} className="h-full">
               <ServiceCard {...s} />
             </Reveal>
           ))}

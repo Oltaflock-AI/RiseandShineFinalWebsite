@@ -3,7 +3,7 @@ import { PageHero } from "@/components/sections/PageHero";
 import { SectionHeading } from "@/components/sections/SectionHeading";
 import { CTABand } from "@/components/sections/CTABand";
 import { Container } from "@/components/ui/Container";
-import { InfoCard } from "@/components/ui/InfoCard";
+import { ServiceFeatureCard } from "@/components/ui/ServiceFeatureCard";
 import { Feature } from "@/components/ui/Feature";
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
@@ -29,12 +29,10 @@ export default function ServicesPage() {
 
       <section className="py-20 sm:py-28">
         <Container>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {services.map((s, i) => (
-              <Reveal key={s.title} delay={(i % 3) * 0.1}>
-                <InfoCard icon={s.icon} title={s.title}>
-                  {s.description}
-                </InfoCard>
+              <Reveal key={s.title} delay={(i % 3) * 0.1} className="h-full">
+                <ServiceFeatureCard {...s} />
               </Reveal>
             ))}
           </div>
@@ -49,14 +47,16 @@ export default function ServicesPage() {
             title="Planning made effortless"
             className="mb-12"
           />
-          <div className="mx-auto grid max-w-4xl gap-8 sm:grid-cols-2">
+          <div className="mx-auto grid max-w-4xl gap-5 sm:grid-cols-2">
             {howItWorks.map((s, i) => (
-              <Reveal key={s.step} delay={(i % 2) * 0.1}>
-                <Feature
-                  number={s.step}
-                  title={s.title}
-                  description={s.description}
-                />
+              <Reveal key={s.step} delay={(i % 2) * 0.1} className="h-full">
+                <div className="h-full rounded-brand-lg border border-line bg-white p-6 shadow-brand-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-brand">
+                  <Feature
+                    number={s.step}
+                    title={s.title}
+                    description={s.description}
+                  />
+                </div>
               </Reveal>
             ))}
           </div>
