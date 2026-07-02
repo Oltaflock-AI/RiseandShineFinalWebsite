@@ -11,6 +11,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "The white Rann, Gir's lions and the Statue of Unity.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/gujarat.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -62,6 +63,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Pine hills, snow points and scenic mountain drives.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/himachal-pradesh.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -113,6 +115,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Dal Lake shikaras, Mughal gardens and the meadows of Gulmarg.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/kashmir.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -164,6 +167,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Living-root bridges, waterfalls and crystal-clear rivers.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/meghalaya.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -215,6 +219,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Himalayan monasteries, Gangtok and the road to Tsomgo.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/sikkim.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -266,6 +271,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Himalayan foothills, the Ganga aarti and hill-station calm.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/uttarakhand.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -317,6 +323,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Sydney icons, reefs and stunning coastal drives.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/australia.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -368,7 +375,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Rice terraces, temples and serene private-pool villas.",
     "minNights": 3,
     "maxNights": 9,
-    "heroImage": "https://images.unsplash.com/photo-1573843981267-be1999ff37cd?w=1200&q=80",
+    "heroImage": "/packages/bali.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -420,6 +427,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "The Rockies, glacial lakes and vibrant cities.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/canada.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -471,6 +479,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "The Great Wall, the Forbidden City and modern skylines.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/china.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -522,6 +531,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Desert safaris, the Burj Khalifa and dhow-cruise dinners.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/dubai.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -573,6 +583,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "The Pyramids, the Nile and ancient temples.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/egypt.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -624,6 +635,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "The classic multi-country grand tour of Europe.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/europe.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -675,6 +687,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Rome's history, Venice's canals and Tuscan classics.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/italy.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -726,6 +739,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Tokyo lights, Mount Fuji and Kyoto's timeless temples.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/japan.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -777,6 +791,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Twin Towers, Genting highlands and island escapes.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/malaysia.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -828,6 +843,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Overwater villas and turquoise-lagoon island living.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/maldives.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -879,6 +895,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Fjords, adventure sports and cinematic landscapes.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/new-zealand.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -930,6 +947,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Gardens by the Bay, Sentosa and Universal Studios.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/singapore.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -981,6 +999,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Seoul's culture, Nami Island and K-pop energy.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/south-korea.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -1032,6 +1051,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Tea country, ancient cities and golden southern beaches.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/sri-lanka.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -1083,6 +1103,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Alpine rail journeys, the Jungfrau and lakeside towns.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/switzerland.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -1134,6 +1155,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Istanbul, Cappadocia's balloons and coastal blues.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/turkey.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -1185,6 +1207,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "London landmarks and the British countryside.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/united-kingdom.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -1236,6 +1259,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Coast-to-coast icons from New York to California.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/usa.jpg",
     "itinerary": [
       {
         "day": 1,
@@ -1287,6 +1311,7 @@ export const lightItineraries: LightItinerary[] = [
     "tagline": "Halong Bay cruises, lantern-lit old towns and street food.",
     "minNights": 3,
     "maxNights": 9,
+    "heroImage": "/packages/vietnam.jpg",
     "itinerary": [
       {
         "day": 1,

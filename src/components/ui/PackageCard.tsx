@@ -14,7 +14,7 @@ export function PackageCard({
   return (
     <Link
       href={pkg.href}
-      className="group flex flex-col overflow-hidden rounded-brand-lg border border-line bg-white shadow-brand-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-brand-lg"
+      className="group flex h-full flex-col overflow-hidden rounded-brand-lg border border-line bg-white shadow-brand-sm transition-all duration-300 hover:-translate-y-2 hover:shadow-brand-lg"
     >
       <div className="relative aspect-[4/3.2] overflow-hidden">
         {pkg.heroImage ? (
@@ -53,10 +53,10 @@ export function PackageCard({
         <span className="inline-flex items-center gap-1.5 text-[0.82rem] font-medium text-muted">
           <MapPin size={14} className="text-red" aria-hidden /> {pkg.location}
         </span>
-        <h3 className="text-[1.3rem] transition-colors group-hover:text-red">
+        <h3 className="line-clamp-2 text-[1.3rem] transition-colors group-hover:text-red">
           {pkg.title}
         </h3>
-        <p className="text-[0.9rem] text-muted">{pkg.description}</p>
+        <p className="line-clamp-2 text-[0.9rem] text-muted">{pkg.description}</p>
 
         <div className="mt-auto flex items-center justify-between border-t border-dashed border-line pt-4">
           <span className="inline-flex flex-col leading-tight">
