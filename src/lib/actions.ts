@@ -39,6 +39,6 @@ export async function submitEnquiry(
   return {
     status: "success",
     message:
-      "Thank you! Your enquiry has reached the Rise & Shine team — we'll be in touch very shortly.",
+      "Thank you! Your enquiry has reached the Rise & Shine team. We'll be in touch very shortly.",
   };
 }

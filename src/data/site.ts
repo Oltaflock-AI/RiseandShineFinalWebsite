@@ -8,12 +8,26 @@ export const site = {
   name: "Rise & Shine Travels",
   legalName: "Rise & Shine Co",
   tagline: "Handcrafted journeys from Ahmedabad to the world.",
-  established: 2009,
+  // Founded 2011 — verified in both BNI decks and the Justdial listing.
+  established: 2011,
   // Public site URL — update to the real domain before launch.
   url: "https://www.riseandshinetravel.com",
+  // TODO(khush): verify GSTIN against the actual GST certificate before launch.
   gstin: "24AAXFR7477D1ZL",
 
   email: "info@riseandshinetravel.com",
+
+  // Aggregate Google Business rating — verified in the OltaFlock audit (Issue 19).
+  // Rendered via <GoogleReviews>. To go live later, flip `source` to "live" and
+  // wire a Google Places feed using placeId + an API key (no other code changes).
+  reviews: {
+    rating: 5.0,
+    count: 97,
+    source: "static" as "static" | "live",
+    // TODO(khush): confirm the public Google Business profile / reviews URL.
+    url: "https://www.google.com/search?q=Rise+%26+Shine+Travel+Chandkheda+Ahmedabad+reviews",
+    // TODO: add Google Places `placeId` here when moving to a live feed.
+  },
 
   // Landline (Ahmedabad) + mobile / WhatsApp
   phone: {

@@ -24,7 +24,7 @@ export function PackageCard({
       <div className="relative aspect-[4/3.2] overflow-hidden">
         <Image
           src={photo(pkg.photoId, 800)}
-          alt={`${pkg.title} — ${pkg.location}`}
+          alt={`${pkg.title}, ${pkg.location}`}
           fill
           sizes="(max-width:640px) 100vw, (max-width:1024px) 50vw, 33vw"
           className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"

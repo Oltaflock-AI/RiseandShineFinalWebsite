@@ -54,7 +54,7 @@ export function Header() {
           <Link
             href="/"
             className="relative flex items-center"
-            aria-label={`${site.name} — home`}
+            aria-label={`${site.name}, home`}
           >
             <Image
               src="/brand/logo-white.png"

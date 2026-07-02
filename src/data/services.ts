@@ -45,7 +45,7 @@ export const homeServices: Service[] = [
     icon: "compass",
     title: "Custom Tours",
     description:
-      "Tell us your dream — we design a flexible, creative itinerary around it.",
+      "Tell us your dream and we'll design a flexible, creative itinerary around it.",
   },
 ];
 
@@ -73,13 +73,13 @@ export const services: Service[] = [
     icon: "tours",
     title: "Trips & Tours",
     description:
-      "Explore the world with us — guided group tours and independent holidays across 40+ destinations.",
+      "Explore the world with us: guided group tours and independent holidays across 30+ countries.",
   },
   {
     icon: "ship",
     title: "Cruises",
     description:
-      "Enjoy your best cruise experience — the right cabins, routes and onboard packages at great fares.",
+      "Enjoy your best cruise experience: the right cabins, routes and onboard packages at great fares.",
   },
   {
     icon: "compass",
@@ -91,7 +91,7 @@ export const services: Service[] = [
     icon: "visa",
     title: "Visa Services",
     description:
-      "End-to-end visa assistance — documentation, applications and appointment guidance.",
+      "End-to-end visa assistance: documentation, applications and appointment guidance.",
   },
   {
     icon: "passport",
@@ -104,6 +104,12 @@ export const services: Service[] = [
     title: "Travel Insurance",
     description:
       "The right coverage for medical, baggage and cancellation peace of mind.",
+  },
+  {
+    icon: "users",
+    title: "Corporate & Group Travel",
+    description:
+      "Dealer meets, incentive trips, MICE and wedding & event groups, planned end to end for teams, companies and institutions.",
   },
 ];
 
@@ -122,7 +128,7 @@ export const howItWorks: { step: number; title: string; description: string }[] 
     {
       step: 3,
       title: "Confirm & relax",
-      description: "We book flights, stays, transfers and visas — everything.",
+      description: "We book flights, stays, transfers and visas. Everything.",
     },
     {
       step: 4,

@@ -2,7 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** Animated count-up that triggers when scrolled into view. */
+/**
+ * Animated count-up that triggers when scrolled into view.
+ *
+ * Robustness contract (per the content brief — a counter must NEVER render 0):
+ *  - Initial state is the real `value`, so SSR / no-JS / hydration-failure all
+ *    render the true number.
+ *  - The count-up only runs on the client, and a safety timeout guarantees the
+ *    final value is set even if requestAnimationFrame is starved (backgrounded
+ *    tab, heavy throttling, etc.), so it can never get stuck mid-animation at 0.
+ */
 export function Counter({
   value,
   suffix = "",
@@ -13,7 +22,7 @@ export function Counter({
   duration?: number;
 }) {
   const ref = useRef<HTMLSpanElement | null>(null);
-  const [display, setDisplay] = useState(0);
+  const [display, setDisplay] = useState(value);
   const started = useRef(false);
 
   useEffect(() => {
@@ -24,28 +33,50 @@ export function Counter({
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+    // No animation path: the real value is already displayed — leave it.
+    if (prefersReduced || typeof requestAnimationFrame === "undefined") {
+      return;
+    }
+
+    let raf = 0;
+    let safety = 0;
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      setDisplay(value);
+    };
+
     const run = () => {
       if (started.current) return;
       started.current = true;
-      if (prefersReduced || typeof requestAnimationFrame === "undefined") {
-        setDisplay(value);
-        return;
-      }
-      const start = performance.now();
+
+      // Guarantee the real value lands even if rAF never progresses.
+      safety = window.setTimeout(finish, duration + 400);
+
+      let startTs = 0;
       const tick = (now: number) => {
-        const p = Math.min((now - start) / duration, 1);
+        if (done) return;
+        if (!startTs) startTs = now;
+        const p = Math.min((now - startTs) / duration, 1);
         const eased = 1 - Math.pow(1 - p, 3);
-        setDisplay(Math.floor(eased * value));
-        if (p < 1) requestAnimationFrame(tick);
-        else setDisplay(value);
+        setDisplay(Math.round(eased * value));
+        if (p < 1) raf = requestAnimationFrame(tick);
+        else finish();
       };
-      requestAnimationFrame(tick);
+      setDisplay(0);
+      raf = requestAnimationFrame(tick);
     };
 
     if (typeof IntersectionObserver === "undefined") {
       run();
-      return;
+      return () => {
+        if (raf) cancelAnimationFrame(raf);
+        if (safety) clearTimeout(safety);
+      };
     }
+
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -58,7 +89,12 @@ export function Counter({
       { threshold: 0.5 },
     );
     io.observe(el);
-    return () => io.disconnect();
+
+    return () => {
+      io.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+      if (safety) clearTimeout(safety);
+    };
   }, [value, duration]);
 
   return (

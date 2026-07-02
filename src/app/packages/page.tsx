@@ -15,7 +15,7 @@ import {
 export const metadata: Metadata = {
   title: "Holiday Packages",
   description:
-    "Curated domestic, international and cruise holiday packages — flexible, fully managed and priced right. Browse Rise & Shine Travels' itineraries.",
+    "Curated domestic, international and cruise holiday packages: flexible, fully managed and priced right. Browse Rise & Shine Travels' itineraries.",
   alternates: { canonical: "/packages" },
 };
 
@@ -28,7 +28,7 @@ export default function PackagesPage() {
         crumb="Packages"
         photoId="photo-1500835556837-99ac94a94552"
         title="Find your perfect holiday"
-        subtitle="Curated itineraries across India and the world — flexible, fully managed and priced right."
+        subtitle="Curated itineraries across India and the world: flexible, fully managed and priced right."
       />
 
       <section className="py-20 sm:py-28">

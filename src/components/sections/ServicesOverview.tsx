@@ -14,7 +14,7 @@ export function ServicesOverview() {
             title={
               <>
                 From the first flight to the
-                <br className="hidden sm:block" /> last sunset — we&apos;ve got
+                <br className="hidden sm:block" /> last sunset, we&apos;ve got
                 it.
               </>
             }

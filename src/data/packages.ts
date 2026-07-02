@@ -37,14 +37,14 @@ export const categoryMeta: Record<
     label: "Domestic",
     title: "Domestic Escapes",
     blurb:
-      "Discover the beauty of India — backwaters, palaces, peaks and beaches, all fully managed and priced right.",
+      "Discover the beauty of India: backwaters, palaces, peaks and beaches, all fully managed and priced right.",
     photoId: "photo-1506905925346-21bda4d32df4",
   },
   international: {
     label: "International",
     title: "International Holidays",
     blurb:
-      "Island honeymoons to alpine adventures — international getaways with flights, stays and sightseeing handled.",
+      "From island honeymoons to alpine adventures, with flights, stays and sightseeing all handled.",
     photoId: "photo-1514282401047-d79a71a590e8",
   },
   cruise: {
@@ -136,7 +136,7 @@ export const packages: Package[] = [
     days: 5,
     priceFrom: 89900,
     rating: 5.0,
-    description: "A private villa over a turquoise lagoon — flights included.",
+    description: "A private villa over a turquoise lagoon, flights included.",
     photoId: "photo-1514282401047-d79a71a590e8",
     featured: true,
   },
@@ -217,7 +217,7 @@ export const packages: Package[] = [
     days: 8,
     priceFrom: 128000,
     rating: 4.9,
-    description: "Italy, France and Spain — all-inclusive at sea.",
+    description: "Italy, France and Spain, all-inclusive at sea.",
     photoId: "photo-1530841377377-3ff06c0ca713",
   },
   {

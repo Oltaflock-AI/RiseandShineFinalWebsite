@@ -6,7 +6,7 @@ import { photo } from "@/data/packages";
 import { site } from "@/data/site";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
-import { Stars } from "../ui/Stars";
+import { GoogleReviews } from "../ui/GoogleReviews";
 import { cn } from "@/lib/cn";
 
 const heroPhotos = [
@@ -84,7 +84,7 @@ export function Hero() {
           </h1>
 
           <p className="mt-6 max-w-xl text-lg font-light text-white/85">
-            We plan thinking of you — your pace, your people, your budget — and
+            We plan thinking of you: your pace, your people, your budget. And
             we sweat the little details so your holiday turns out exceptional.
             Domestic, international and at sea.
           </p>
@@ -98,12 +98,8 @@ export function Hero() {
             </Button>
           </div>
 
-          <div className="mt-12 flex items-center gap-4">
-            <Stars className="text-white" size={16} label="Rated 4.9 out of 5" />
-            <p className="text-[0.88rem] text-white/80">
-              <b className="font-semibold text-white">4.9/5</b> from 12,000+
-              travellers since {site.established}
-            </p>
+          <div className="mt-12">
+            <GoogleReviews tone="dark" />
           </div>
         </div>
       </Container>

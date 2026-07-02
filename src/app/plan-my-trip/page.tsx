@@ -7,7 +7,7 @@ import { PlanTripForm } from "@/components/forms/PlanTripForm";
 export const metadata: Metadata = {
   title: "Plan My Trip",
   description:
-    "Tell us a few details and Rise & Shine Travels will craft a personalised itinerary and quote — completely free.",
+    "Tell us a few details and Rise & Shine Travels will craft a personalised itinerary and quote, completely free.",
   alternates: { canonical: "/plan-my-trip" },
 };
 
@@ -25,7 +25,7 @@ export default async function PlanMyTripPage({
         crumb="Plan My Trip"
         photoId="photo-1452421822248-d4c2b47f0c81"
         title="Plan my trip"
-        subtitle="Tell us a few details and we'll craft a personalised itinerary and quote — completely free."
+        subtitle="Tell us a few details and we'll craft a personalised itinerary and quote, completely free."
       />
 
       <section className="py-20 sm:py-28">

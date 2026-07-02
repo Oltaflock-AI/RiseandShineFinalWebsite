@@ -3,6 +3,7 @@ import { testimonials } from "@/data/testimonials";
 import { Container } from "../ui/Container";
 import { SectionHeading } from "./SectionHeading";
 import { Stars } from "../ui/Stars";
+import { GoogleReviews } from "../ui/GoogleReviews";
 import { Reveal } from "../ui/Reveal";
 
 export function Testimonials() {
@@ -11,10 +12,13 @@ export function Testimonials() {
       <Container>
         <SectionHeading
           center
-          eyebrow="Postcards from our travellers"
+          eyebrow="Rated 5.0 on Google"
           title="Don't take our word for it"
-          className="mb-12"
+          className="mb-6"
         />
+        <div className="mb-14 flex justify-center">
+          <GoogleReviews />
+        </div>
         <div className="grid gap-6 md:grid-cols-3">
           {testimonials.map((t, i) => (
             <Reveal key={t.name} delay={(i % 3) * 0.1}>

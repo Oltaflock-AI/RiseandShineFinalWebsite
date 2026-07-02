@@ -38,7 +38,7 @@ export default function ItineraryPage() {
             <p className="mt-4 text-ink-soft">
               We&apos;re building a smart itinerary generator to design your
               perfect trip in seconds. Until it launches, tell us what you&apos;re
-              dreaming of and our team will put together a tailor-made plan — free
+              dreaming of and our team will put together a tailor-made plan, free
               of charge.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3.5">

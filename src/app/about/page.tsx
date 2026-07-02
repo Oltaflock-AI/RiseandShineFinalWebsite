@@ -10,12 +10,11 @@ import { Feature } from "@/components/ui/Feature";
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 import { aboutStats, values } from "@/data/content";
-import { photo } from "@/data/packages";
 
 export const metadata: Metadata = {
   title: "About Us",
   description:
-    "Rise & Shine Travels listens first, then plans. Since 2009 we've crafted flexible, creative and detail-obsessed journeys from Ahmedabad to the world.",
+    "Founded in 2011 by Hardik Patel and Alpesh, Rise & Shine Travel is an Ahmedabad travel house that has planned journeys across 30+ countries for travellers of 55 nationalities.",
   alternates: { canonical: "/about" },
 };
 
@@ -32,7 +31,7 @@ export default function AboutPage() {
             Then we plan.
           </>
         }
-        subtitle="Rise & Shine always works thinking of you — your needs, but above all, your expectations."
+        subtitle="An Ahmedabad travel house since 2011, planning journeys people remember for travellers of every kind."
       />
 
       <section className="py-20 sm:py-28">
@@ -45,11 +44,12 @@ export default function AboutPage() {
               />
               <div className="relative overflow-hidden rounded-brand-lg shadow-brand-lg">
                 <Image
-                  src={photo("photo-1507525428034-b723cf961d3e", 900)}
-                  alt="Travellers watching the sunrise on a quiet beach"
-                  width={900}
-                  height={1050}
-                  className="h-full w-full object-cover"
+                  src="/brand/founders.png"
+                  alt="Rise & Shine Travel founders Hardik Patel and Alpesh"
+                  width={1393}
+                  height={2477}
+                  sizes="(min-width: 1024px) 40vw, 90vw"
+                  className="h-auto w-full object-cover"
                 />
               </div>
               <div className="absolute -bottom-6 -right-3 flex items-center gap-3.5 rounded-2xl bg-white p-4 pr-6 shadow-brand sm:-right-6">
@@ -72,26 +72,33 @@ export default function AboutPage() {
                 eyebrow="Our story"
                 title={
                   <>
-                    Every detail is important — so we care for the{" "}
+                    Two founders who chose{" "}
                     <span className="text-script text-[1.12em] text-red">
-                      little things
-                    </span>
-                    .
+                      travel
+                    </span>{" "}
+                    over the family business.
                   </>
                 }
               />
               <p className="mt-4 text-ink-soft">
-                &ldquo;Rise &amp; Shine Co.&rdquo; always works thinking of you, of
-                your needs, but above all, your expectations. We know that every
-                detail is important, and for this reason we make our best effort
-                to care for all those little things that will always make the
-                difference, so that your trip will be exceptional.
+                Rise &amp; Shine Travel began in 2011, when Hardik Patel and
+                Alpesh left a settled government construction business to build
+                something around what they loved most: travel. What started as
+                two friends planning trips has grown into one of
+                Ahmedabad&apos;s most trusted travel houses.
               </p>
               <p className="mt-4 text-ink-soft">
-                Our service is flexible and creative in the design of itineraries
-                — and we&apos;re diligent in selecting our transport personnel,
-                guides and everyone involved in the operation. That&apos;s the
-                Rise &amp; Shine difference.
+                Fifteen-plus years on, we&apos;ve planned journeys across 30+
+                countries for travellers of 55 nationalities, from families
+                and honeymooners to corporate teams, with a 98% success rate
+                on the visas we file. As members of ADTOI, IATTE, TAG, Gujarat
+                Tourism, TAFI and BNI, we bring that experience to every
+                itinerary.
+              </p>
+              <p className="mt-4 text-ink-soft">
+                We still work the way we started: we listen first, plan around
+                your pace and your people, and happily sweat the small details
+                that turn a good trip into one you talk about for years.
               </p>
             </Reveal>
           </div>
@@ -121,7 +128,7 @@ export default function AboutPage() {
 
       <CTABand
         title="Let's craft your next journey together."
-        text="Share your dream destination and we'll handle the rest — flights, stays, sightseeing and more."
+        text="Share your dream destination and we'll handle the rest: flights, stays, sightseeing and more."
         photoId="photo-1476514525535-07fb3b4ae5f1"
       >
         <Button href="/plan-my-trip" arrow>

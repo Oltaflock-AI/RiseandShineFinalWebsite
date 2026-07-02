@@ -56,9 +56,9 @@ export function AboutSplit() {
             />
             <p className="mt-4 text-ink-soft">
               We know every detail matters. That&apos;s why we&apos;re diligent
-              about the people behind your trip — the drivers, the guides, the
-              partners on the ground — and flexible and creative in how we design
-              each itinerary. You get a holiday that fits you, not a package off
+              about the people behind your trip: the drivers, the guides, the
+              partners on the ground. We stay flexible and creative in how we
+              design each itinerary. You get a holiday that fits you, not a package off
               a shelf.
             </p>
             <div className="mt-8 grid gap-6 sm:grid-cols-2">

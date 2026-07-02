@@ -25,7 +25,7 @@ export default function HomePage() {
       <Accreditations soft />
       <CTABand
         title="Tell us where you'd love to wake up next."
-        text="Share your dream destination and we'll craft a personalised itinerary and quote — free of charge, no pressure."
+        text="Share your dream destination and we'll craft a personalised itinerary and quote, free of charge and no pressure."
         photoId="photo-1530841377377-3ff06c0ca713"
       >
         <Button href="/plan-my-trip" arrow>

@@ -22,12 +22,12 @@ const dancing = Dancing_Script({
 });
 
 const description =
-  "Rise & Shine Travels — Ahmedabad's trusted travel house since 2009. Handcrafted domestic, international & cruise holidays, flights, hotels, visas and custom tours, all from one team.";
+  "Rise & Shine Travels is Ahmedabad's trusted travel house, established 2011. We handle domestic, international and cruise holidays, flights, hotels, visas and custom tours, all from one team.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
-    default: `${site.name} — Handcrafted Holidays from Ahmedabad`,
+    default: `${site.name}: Handcrafted Holidays from Ahmedabad`,
     template: `%s · ${site.name}`,
   },
   description,
@@ -50,13 +50,13 @@ export const metadata: Metadata = {
     locale: "en_IN",
     siteName: site.name,
     url: site.url,
-    title: `${site.name} — Handcrafted Holidays from Ahmedabad`,
+    title: `${site.name}: Handcrafted Holidays from Ahmedabad`,
     description,
     images: [{ url: "/brand/og.png", width: 1200, height: 630, alt: site.name }],
   },
   twitter: {
     card: "summary_large_image",
-    title: `${site.name} — Handcrafted Holidays from Ahmedabad`,
+    title: `${site.name}: Handcrafted Holidays from Ahmedabad`,
     description,
     images: ["/brand/og.png"],
   },

@@ -13,7 +13,7 @@ import { site } from "@/data/site";
 export const metadata: Metadata = {
   title: "Services",
   description:
-    "Hotels, flights, car rentals, cruises, custom tours, visa & passport help and travel insurance — every travel need handled by one Ahmedabad team.",
+    "Hotels, flights, car rentals, cruises, custom tours, visa & passport help and travel insurance. Every travel need handled by one Ahmedabad team.",
   alternates: { canonical: "/services" },
 };
 
@@ -24,7 +24,7 @@ export default function ServicesPage() {
         crumb="Services"
         photoId="photo-1436491865332-7a61a109cc05"
         title="One agency, every travel need"
-        subtitle="From the first flight booking to the last hotel check-out — and the visa paperwork in between — we handle it all."
+        subtitle="From the first flight booking to the last hotel check-out, and the visa paperwork in between, we handle it all."
       />
 
       <section className="py-20 sm:py-28">
@@ -65,7 +65,7 @@ export default function ServicesPage() {
 
       <CTABand
         title="Need a specific service?"
-        text="Hotels, flights, visas or a full holiday — send us your requirement and we'll get right back to you."
+        text="Hotels, flights, visas or a full holiday. Send us your requirement and we'll get right back to you."
         photoId="photo-1476514525535-07fb3b4ae5f1"
       >
         <Button href="/plan-my-trip" arrow>

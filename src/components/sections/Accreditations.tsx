@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { accreditations } from "@/data/accreditations";
 import { Container } from "../ui/Container";
 import { Eyebrow } from "../ui/Eyebrow";
@@ -11,16 +12,24 @@ export function Accreditations({ soft = false }: { soft?: boolean }) {
         <Eyebrow center>Recognised &amp; accredited</Eyebrow>
         <h2 className="h-md mb-8">A proud member of</h2>
         <Reveal>
-          <div className="flex flex-wrap justify-center gap-4">
+          <ul className="flex flex-wrap items-center justify-center gap-4">
             {accreditations.map((a) => (
-              <span
-                key={a}
-                className="rounded-2xl border border-line bg-white px-7 py-4 font-bold text-navy shadow-brand-sm transition-all duration-200 hover:-translate-y-1 hover:text-red hover:shadow-brand"
+              <li
+                key={a.name}
+                title={a.full}
+                className="flex h-24 w-40 items-center justify-center rounded-2xl border border-line bg-white px-6 py-4 shadow-brand-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-brand"
               >
-                {a}
-              </span>
+                <Image
+                  src={a.logo}
+                  alt={a.full}
+                  width={160}
+                  height={96}
+                  sizes="160px"
+                  className="max-h-14 w-auto object-contain"
+                />
+              </li>
             ))}
-          </div>
+          </ul>
         </Reveal>
       </Container>
     </section>
