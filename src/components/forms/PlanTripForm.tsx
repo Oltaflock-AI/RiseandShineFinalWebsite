@@ -3,14 +3,29 @@
 import { useActionState } from "react";
 import { submitEnquiry } from "@/lib/actions";
 import { site } from "@/data/site";
+import { GOOGLE_FORM } from "@/lib/googleForm";
 import { Button } from "../ui/Button";
 import { Field, FormNote, controlClass, initialFormState } from "./controls";
 import { cn } from "@/lib/cn";
 
+const JOURNEY_TYPES = [
+  "Domestic",
+  "International",
+  "Cruise",
+  "Honeymoon",
+  "Group / Corporate",
+];
+
 export function PlanTripForm({
   defaultDestination = "",
+  defaultJourneyType = "Domestic",
+  defaultMessage = "",
+  packageKey = "",
 }: {
   defaultDestination?: string;
+  defaultJourneyType?: string;
+  defaultMessage?: string;
+  packageKey?: string;
 }) {
   const [state, action, pending] = useActionState(
     submitEnquiry,
@@ -22,6 +37,7 @@ export function PlanTripForm({
       action={action}
       className="rounded-brand-lg border border-line bg-white p-7 shadow-brand sm:p-10"
     >
+      <input type="hidden" name="package" value={packageKey} />
       <h2 className="h-md mb-1.5">Your trip details</h2>
       <p className="mb-6 text-muted">
         The more you tell us, the better we can tailor your plan.
@@ -65,14 +81,12 @@ export function PlanTripForm({
           <select
             id="t-type"
             name="journeyType"
-            defaultValue="Domestic"
+            defaultValue={defaultJourneyType}
             className={controlClass}
           >
-            <option>Domestic</option>
-            <option>International</option>
-            <option>Cruise</option>
-            <option>Honeymoon</option>
-            <option>Group / Corporate</option>
+            {JOURNEY_TYPES.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
           </select>
         </Field>
         <Field label="Destination" htmlFor="t-dest">
@@ -127,6 +141,7 @@ export function PlanTripForm({
             id="t-message"
             name="message"
             rows={4}
+            defaultValue={defaultMessage}
             placeholder="Interests, must-sees, special occasions, dietary needs, anything else…"
             className={cn(controlClass, "min-h-28 resize-y")}
           />
@@ -145,6 +160,15 @@ export function PlanTripForm({
           className="font-semibold text-red hover:underline"
         >
           {site.phone.landlineDisplay}
+        </a>
+        {" · "}
+        <a
+          href={GOOGLE_FORM.viewUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold text-red hover:underline"
+        >
+          open our inquiry form
         </a>
       </p>
     </form>

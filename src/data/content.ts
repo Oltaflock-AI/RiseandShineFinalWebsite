@@ -81,16 +81,17 @@ export const aboutStats: Stat[] = [
   { value: 6, label: "Industry accreditations" },
 ];
 
-/** Destinations for the home marquee. */
+/** Destinations for the home marquee — aligned with the real package catalogue. */
 export const marqueeDestinations = [
   "Kerala",
-  "Maldives",
-  "Dubai",
-  "Bali",
-  "Kashmir",
-  "Mauritius",
-  "Thailand",
-  "Switzerland",
-  "Singapore",
+  "Rajasthan",
+  "Goa",
   "Andaman",
+  "Golden Triangle",
+  "Thailand",
+  "Mauritius",
+  "Dubai",
+  "Hong Kong",
+  "Singapore",
+  "Bali",
 ];
