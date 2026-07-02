@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 import { CTABand } from "@/components/sections/CTABand";
 import { LightItineraryDetail } from "@/components/sections/LightItineraryDetail";
+import { LiveFare } from "@/components/ui/LiveFare";
 import { site } from "@/data/site";
 import { CATALOG_PACKAGES, PACKAGE_LIST, isCatalogPackage } from "@/data/catalog";
 import type { CatalogPackage, PackageCategory } from "@/data/catalog/types";
@@ -281,6 +282,9 @@ export default async function PackageDetailPage({
                   <Plane size={20} className="text-red" aria-hidden />
                   <h2 className="h-md">Flights</h2>
                 </div>
+                {pkg.arrivalAirport && (
+                  <LiveFare to={pkg.arrivalAirport} nights={pkg.durationNights} />
+                )}
                 <div className="grid gap-4 sm:grid-cols-2">
                   {[pkg.flights.outbound, pkg.flights.inbound].map((leg) => (
                     <div

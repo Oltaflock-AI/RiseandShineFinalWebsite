@@ -49,6 +49,8 @@
   --animate-morph: morph 12s ease-in-out infinite;
   --animate-marquee: marquee 34s linear infinite;
   --animate-fade-up: fade-up 0.5s ease both;
+  --animate-fly: fly 1.9s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  --animate-trail: trail 1.9s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
 
   /* container */
   --breakpoint-3xl: 120rem;
@@ -86,6 +88,48 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+/* plane sweeping along a flight path (branded loader) */
+@keyframes fly {
+  0% {
+    left: -2%;
+    opacity: 0;
+    transform: translateY(-50%) rotate(45deg) scale(0.85);
+  }
+  18% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-72%) rotate(45deg) scale(1);
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    left: 102%;
+    opacity: 0;
+    transform: translateY(-50%) rotate(45deg) scale(0.85);
+  }
+}
+/* the red trail drawn in behind the plane */
+@keyframes trail {
+  0% {
+    width: 0;
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  55% {
+    width: 100%;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    width: 100%;
+    opacity: 0;
   }
 }
 
