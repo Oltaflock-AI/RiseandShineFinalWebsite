@@ -109,12 +109,19 @@ type RawSeg = {
   Destination?: { Airport?: { AirportCode?: string; CityName?: string; Terminal?: string }; ArrTime?: string };
   Duration?: number;
 };
+type RawFareBreakdown = {
+  PassengerType?: number; // 1 = Adult, 2 = Child, 3 = Infant
+  PassengerCount?: number;
+  BaseFare?: number;
+  Tax?: number;
+};
 type RawResult = {
   ResultIndex: string;
   IsLCC?: boolean;
   IsRefundable?: boolean;
   AirlineCode?: string;
   Fare?: { PublishedFare?: number; OfferedFare?: number; BaseFare?: number; Tax?: number };
+  FareBreakdown?: RawFareBreakdown[];
   Segments?: RawSeg[][];
 };
 
@@ -147,8 +154,42 @@ function totalDuration(legs: RawSeg[]): number {
   return legs.reduce((a, s) => a + (s.Duration ?? 0), 0);
 }
 
-function mapResult(r: RawResult): FlightOffer {
+/**
+ * Fare PER ADULT. TBO's `Fare.PublishedFare` is the TOTAL across all
+ * passengers, so for a 2-adult search it is double the single-seat price.
+ * The adult `FareBreakdown` entry (PassengerType 1) carries that pax type's
+ * total, which we divide by its count to get one adult's fare. Falls back to
+ * PublishedFare / adults when no breakdown is present.
+ */
+function perAdultFare(
+  r: RawResult,
+  adults: number,
+): { fareINR: number; baseINR: number; taxINR: number } {
+  const fb = r.FareBreakdown?.find(
+    (b) => (b.PassengerType ?? 0) === 1 && (b.PassengerCount ?? 0) > 0,
+  );
+  if (fb) {
+    const n = fb.PassengerCount as number;
+    const base = (fb.BaseFare ?? 0) / n;
+    const tax = (fb.Tax ?? 0) / n;
+    return {
+      fareINR: Math.round(base + tax),
+      baseINR: Math.round(base),
+      taxINR: Math.round(tax),
+    };
+  }
+  const total = r.Fare?.PublishedFare ?? r.Fare?.OfferedFare ?? 0;
+  const per = adults > 0 ? total / adults : total;
+  return {
+    fareINR: Math.round(per),
+    baseINR: Math.round((r.Fare?.BaseFare ?? 0) / Math.max(1, adults)),
+    taxINR: Math.round((r.Fare?.Tax ?? 0) / Math.max(1, adults)),
+  };
+}
+
+function mapResult(r: RawResult, adults: number): FlightOffer {
   const legs = r.Segments?.[0] ?? [];
+  const fare = perAdultFare(r, adults);
   return {
     id: r.ResultIndex,
     airlineCode: r.AirlineCode ?? legs[0]?.Airline?.AirlineCode ?? "",
@@ -157,9 +198,9 @@ function mapResult(r: RawResult): FlightOffer {
     isRefundable: Boolean(r.IsRefundable),
     stops: Math.max(0, legs.length - 1),
     durationMin: totalDuration(legs),
-    fareINR: Math.round(r.Fare?.PublishedFare ?? r.Fare?.OfferedFare ?? 0),
-    baseINR: Math.round(r.Fare?.BaseFare ?? 0),
-    taxINR: Math.round(r.Fare?.Tax ?? 0),
+    fareINR: fare.fareINR,
+    baseINR: fare.baseINR,
+    taxINR: fare.taxINR,
     segments: legs.map(mapSegment),
   };
 }
@@ -281,10 +322,10 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
 
   const groups = R.Results;
   const outbound = dedupe(
-    groups[0].map(mapResult).sort((a, b) => a.fareINR - b.fareINR),
+    groups[0].map((r) => mapResult(r, adults)).sort((a, b) => a.fareINR - b.fareINR),
   );
   const inbound = groups[1]
-    ? dedupe(groups[1].map(mapResult).sort((a, b) => a.fareINR - b.fareINR))
+    ? dedupe(groups[1].map((r) => mapResult(r, adults)).sort((a, b) => a.fareINR - b.fareINR))
     : undefined;
   const cheapestINR =
     args.returnISO && inbound?.length

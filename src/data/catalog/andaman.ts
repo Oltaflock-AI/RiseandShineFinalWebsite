@@ -62,7 +62,7 @@ export const ANDAMAN_PACKAGE: CatalogPackage = {
     carrier: "IndiGo (6E) · via Mumbai",
     perAdultUSD: 257,
     fareNote:
-      "Indicative round-trip economy from Ahmedabad (AMD), 1 stop. Average market fare ≈ ₹22,000 per adult, confirmed on booking.",
+      "Sample round-trip economy routing from Ahmedabad (AMD), 1 stop via Mumbai. See the live fares above; your final price is confirmed on booking.",
     source: "sample",
     alternatives: [],
     outbound: {

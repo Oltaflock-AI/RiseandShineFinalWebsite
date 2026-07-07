@@ -75,7 +75,7 @@ export function mkFlights(
   return {
     carrier,
     perAdultUSD: Math.round(perAdultINR / FX_DEFAULT),
-    fareNote: `Indicative round-trip economy from Ahmedabad (AMD). Average market fare ≈ ₹${perAdultINR.toLocaleString("en-IN")} per adult, confirmed on booking.`,
+    fareNote: `Sample round-trip economy routing from Ahmedabad (AMD). See the live fares above; your final price is confirmed on booking.`,
     source: "sample",
     alternatives: [],
     outbound,
