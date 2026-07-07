@@ -216,38 +216,50 @@ function dedupe(offers: FlightOffer[]): FlightOffer[] {
   });
 }
 
-async function rawSearch(
-  token: string,
-  from: string,
-  to: string,
-  departISO: string,
-  returnISO: string | undefined,
-  adults: number,
-  children: number,
-  infants: number,
-) {
-  const seg = (o: string, d: string, date: string) => ({
-    Origin: o,
-    Destination: d,
-    FlightCabinClass: "1",
+/** Cabin display name → TBO FlightCabinClass code (1=All, 2=Economy, …). */
+const CABIN_CODE: Record<string, string> = {
+  "Economy": "2",
+  "Premium Economy": "3",
+  "Business": "4",
+  "First": "6",
+};
+
+type RawSearchOpts = {
+  from: string;
+  to: string;
+  departISO: string;
+  returnISO?: string;
+  adults: number;
+  children: number;
+  infants: number;
+  cabinCode: string;
+  directOnly: boolean;
+  preferredAirlines: string[] | null;
+};
+
+async function rawSearch(token: string, o: RawSearchOpts) {
+  const seg = (from: string, to: string, date: string) => ({
+    Origin: from,
+    Destination: to,
+    FlightCabinClass: o.cabinCode,
     PreferredDepartureTime: `${date}T00:00:00`,
     PreferredArrivalTime: `${date}T00:00:00`,
   });
-  const segments = [seg(from, to, departISO)];
-  if (returnISO) segments.push(seg(to, from, returnISO));
+  const segments = [seg(o.from, o.to, o.departISO)];
+  if (o.returnISO) segments.push(seg(o.to, o.from, o.returnISO));
   const r = await fetch(SEARCH_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       EndUserIp: cfg().ip,
       TokenId: token,
-      AdultCount: String(Math.max(1, adults)),
-      ChildCount: String(children),
-      InfantCount: String(infants),
-      DirectFlight: "false",
+      AdultCount: String(Math.max(1, o.adults)),
+      ChildCount: String(o.children),
+      InfantCount: String(o.infants),
+      DirectFlight: o.directOnly ? "true" : "false",
       OneStopFlight: "false",
-      JourneyType: returnISO ? "2" : "1",
-      PreferredAirlines: null,
+      JourneyType: o.returnISO ? "2" : "1",
+      PreferredAirlines: o.preferredAirlines,
       Segments: segments,
       Sources: null,
     }),
@@ -268,12 +280,24 @@ export type SearchArgs = {
   adults?: number;
   children?: number;
   infants?: number;
+  /** Cabin display name: "Economy" | "Premium Economy" | "Business" | "First". */
+  cabin?: string;
+  /** Non-stop flights only. */
+  directOnly?: boolean;
+  /** Restrict to specific airline codes (e.g. ["6E"]); null/undefined = all. */
+  preferredAirlines?: string[];
 };
 
 export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
   const from = args.from.toUpperCase();
   const to = args.to.toUpperCase();
   const adults = Math.max(1, args.adults ?? 1);
+  const children = Math.max(0, args.children ?? 0);
+  const infants = Math.max(0, args.infants ?? 0);
+  const cabinCode = CABIN_CODE[args.cabin ?? ""] ?? "1";
+  const directOnly = Boolean(args.directOnly);
+  const preferredAirlines =
+    args.preferredAirlines && args.preferredAirlines.length ? args.preferredAirlines : null;
   const base: Omit<FlightSearch, "ok" | "source" | "outbound"> = {
     from,
     to,
@@ -281,9 +305,22 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
     returnISO: args.returnISO,
     adults,
   };
-  const key = `${from}|${to}|${args.departISO}|${args.returnISO ?? ""}|${adults}`;
+  const key = `${from}|${to}|${args.departISO}|${args.returnISO ?? ""}|${adults}|${children}|${infants}|${cabinCode}|${directOnly ? "D" : ""}|${preferredAirlines?.join(",") ?? ""}`;
   const hit = searchCache.get(key);
   if (hit && hit.exp > Date.now()) return hit.data;
+
+  const opts: RawSearchOpts = {
+    from,
+    to,
+    departISO: args.departISO,
+    returnISO: args.returnISO,
+    adults,
+    children,
+    infants,
+    cabinCode,
+    directOnly,
+    preferredAirlines,
+  };
 
   const fail = (error: string): FlightSearch => ({
     ...base,
@@ -298,7 +335,7 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
 
   let j: { Response?: { ResponseStatus?: number; Results?: RawResult[][]; Error?: { ErrorMessage?: string } } };
   try {
-    j = await rawSearch(token, from, to, args.departISO, args.returnISO, adults, args.children ?? 0, args.infants ?? 0);
+    j = await rawSearch(token, opts);
   } catch {
     return fail("network");
   }
@@ -308,7 +345,7 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
     token = await authenticate(true);
     if (token) {
       try {
-        j = await rawSearch(token, from, to, args.departISO, args.returnISO, adults, args.children ?? 0, args.infants ?? 0);
+        j = await rawSearch(token, opts);
       } catch {
         return fail("network");
       }
