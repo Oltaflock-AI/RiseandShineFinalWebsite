@@ -284,6 +284,60 @@ async function recoverFromTimeout(traceId: string, bookingId?: number, pnr?: str
   return null;
 }
 
+export type QuoteResult = {
+  ok: boolean;
+  isLCC?: boolean;
+  /** Total fare for all passengers, re-priced by TBO (may differ from the search fare). */
+  publishedFare?: number;
+  offeredFare?: number;
+  priceChanged?: boolean;
+  /** What TBO says this fare requires — drives which fields the checkout form shows. */
+  flags?: FareQuoteFlags;
+  error?: string;
+};
+
+/**
+ * FareRule + FareQuote only. The checkout page calls this before collecting passenger
+ * details so the form can demand exactly what TBO demands — PAN, passport (and whether
+ * full passport detail is needed), GST, a mandatory seat/meal — rather than guessing.
+ */
+export async function quoteFare(args: {
+  traceId: string;
+  searchedAt: number;
+  resultIndex: string;
+}): Promise<QuoteResult> {
+  try {
+    assertTraceAlive(args.searchedAt);
+    await call(`${SEARCH_SVC}/FareRule`, { TraceId: args.traceId, ResultIndex: args.resultIndex }, TIMEOUT_OTHER, 2);
+    const res = await call(`${SEARCH_SVC}/FareQuote`, { TraceId: args.traceId, ResultIndex: args.resultIndex }, TIMEOUT_OTHER, 2);
+    const FQ = assertOk(res, "FareQuote");
+    const q = (Array.isArray(FQ.Results) ? FQ.Results[0] : FQ.Results) as Json;
+    if (!q) throw new TboError("This fare is no longer available. Please search again.");
+    return {
+      ok: true,
+      isLCC: Boolean(q.IsLCC),
+      publishedFare: q.Fare?.PublishedFare,
+      offeredFare: q.Fare?.OfferedFare,
+      priceChanged: Boolean(FQ.IsPriceChanged),
+      flags: {
+        IsPanRequiredAtBook: q.IsPanRequiredAtBook,
+        IsPanRequiredAtTicket: q.IsPanRequiredAtTicket,
+        IsPassportRequiredAtBook: q.IsPassportRequiredAtBook,
+        IsPassportRequiredAtTicket: q.IsPassportRequiredAtTicket,
+        IsPassportFullDetailRequiredAtBook: q.IsPassportFullDetailRequiredAtBook,
+        IsGSTMandatory: q.IsGSTMandatory,
+        IsPriceChanged: Boolean(FQ.IsPriceChanged),
+        FlightDetailChangeInfo: q.FlightDetailChangeInfo,
+        isseatmandatory: q.IsSeatMandatory ?? q.isseatmandatory,
+        ismealmandatory: q.IsMealMandatory ?? q.ismealmandatory,
+      },
+    };
+  } catch (e) {
+    if (e instanceof TboError || e instanceof TboTimeoutError) return { ok: false, error: e.message };
+    return { ok: false, error: e instanceof Error ? e.message : "Could not price this fare." };
+  }
+}
+
 export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
   try {
     assertTraceAlive(req.searchedAt);

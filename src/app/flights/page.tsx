@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plane, Search, TriangleAlert } from "lucide-react";
+import { Search, TriangleAlert } from "lucide-react";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/sections/SearchBar";
@@ -140,6 +140,21 @@ export default async function FlightsPage({
   });
   const outbound = res.outbound.slice(0, 20);
   const inbound = res.inbound?.slice(0, 20);
+
+  // Everything the checkout needs to price + issue the ticket with TBO. Both the
+  // TraceId and its timestamp must be present — the 15-minute expiry is measured off it.
+  const bookingCtx =
+    res.traceId && res.searchedAt
+      ? {
+          traceId: res.traceId,
+          searchedAt: res.searchedAt,
+          departISO,
+          adults,
+          children: childCount,
+          infants: infantCount,
+          isInternational: fromA?.country !== "IN" || toA.country !== "IN",
+        }
+      : undefined;
   const noResults = !res.ok && /no result|not found|no flight|no fare/i.test(res.error || "");
   const hasFilters = directOnly || cabin !== "Economy" || Boolean(preferredAirlines);
 
@@ -200,7 +215,7 @@ export default async function FlightsPage({
 
               <div className="space-y-4">
                 {outbound.map((o) => (
-                  <FlightCard key={o.id} offer={o} enquireHref={waHref(o, adults)} />
+                  <FlightCard key={o.id} offer={o} enquireHref={waHref(o, adults)} booking={bookingCtx} />
                 ))}
               </div>
 
@@ -211,7 +226,16 @@ export default async function FlightsPage({
                   </h2>
                   <div className="space-y-4">
                     {inbound.map((o) => (
-                      <FlightCard key={o.id} offer={o} enquireHref={waHref(o, adults)} />
+                      <FlightCard
+                        key={o.id}
+                        offer={o}
+                        enquireHref={waHref(o, adults)}
+                        booking={
+                          bookingCtx && returnISO
+                            ? { ...bookingCtx, departISO: returnISO }
+                            : bookingCtx
+                        }
+                      />
                     ))}
                   </div>
                   <p className="mt-4 text-[0.82rem] text-muted">

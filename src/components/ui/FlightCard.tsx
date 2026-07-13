@@ -18,12 +18,25 @@ const fmtDate = (iso: string) => {
   });
 };
 
+/** What the checkout needs to actually book this fare with TBO. */
+export type BookingContext = {
+  traceId: string;
+  searchedAt: number;
+  departISO: string;
+  adults: number;
+  children: number;
+  infants: number;
+  isInternational: boolean;
+};
+
 export function FlightCard({
   offer,
   enquireHref,
+  booking,
 }: {
   offer: FlightOffer;
   enquireHref: string;
+  booking?: BookingContext;
 }) {
   const first = offer.segments[0];
   const last = offer.segments[offer.segments.length - 1];
@@ -103,6 +116,21 @@ export function FlightCard({
             fare: String(offer.fareINR),
             refundable: offer.isRefundable ? "1" : "0",
             wa: enquireHref,
+            // Everything below is what TBO needs to price and issue the ticket.
+            ...(booking
+              ? {
+                  traceId: booking.traceId,
+                  searchedAt: String(booking.searchedAt),
+                  resultIndex: offer.id,
+                  airlineCode: offer.airlineCode,
+                  lcc: offer.isLCC ? "1" : "0",
+                  depart: booking.departISO,
+                  adults: String(booking.adults),
+                  children: String(booking.children),
+                  infants: String(booking.infants),
+                  intl: booking.isInternational ? "1" : "0",
+                }
+              : {}),
           }}
         />
       </div>
