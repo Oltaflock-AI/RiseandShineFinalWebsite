@@ -1,12 +1,20 @@
 "use client";
 
 /**
- * Branded DEMO auth — client-side only (localStorage).
+ * Auth provider — backed by Supabase Auth (email + password).
  *
- * This is a front-end demonstration of the login/signup + booking-gate flow so
- * the client can see how it looks. It is NOT secure and stores users in the
- * browser. When TBO production + payments go live, swap this provider's guts
- * for real server-side auth (the component API — useAuth() — stays the same).
+ * The public API (`useAuth()` → user / ready / login / signup / logout) is
+ * intentionally unchanged from the earlier localStorage demo, so every consumer
+ * (Header, AuthScreen, AccountView) keeps working untouched. What changed is the
+ * engine: real server-verified sessions in httpOnly cookies (via @supabase/ssr),
+ * with data protected by Row Level Security — not the browser.
+ *
+ * The site still runs before Supabase is configured: with no env keys,
+ * `ready` becomes true with a null user and auth calls throw a friendly notice.
+ *
+ * Supabase dashboard note: for instant login-after-signup (the current UX),
+ * turn OFF "Confirm email" under Auth → Providers → Email. Leave it ON and
+ * signup will instead prompt the user to confirm via the emailed link.
  */
 import {
   createContext,
@@ -17,34 +25,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 
 export type User = { name: string; email: string };
-type StoredUser = User & { hash: string };
-
-const USERS_KEY = "rs_users";
-const SESSION_KEY = "rs_session";
-
-async function hashPassword(pw: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pw));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function readUsers(): StoredUser[] {
-  try {
-    return JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-function writeUsers(u: StoredUser[]) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(u));
-}
 
 type AuthContextValue = {
   user: User | null;
-  /** false until we've read localStorage on the client (avoids UI flash). */
+  /** false until we've resolved the session on the client (avoids UI flash). */
   ready: boolean;
   signup: (name: string, email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -53,59 +41,100 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const normEmail = (e: string) => e.trim().toLowerCase();
+const NOT_CONFIGURED =
+  "Accounts aren't available just yet. Please reach us on WhatsApp or by phone and we'll help right away.";
+
+/** Derive a display name from Supabase user metadata, falling back to the email. */
+function toUser(u: SupabaseUser | null): User | null {
+  if (!u) return null;
+  const meta = u.user_metadata ?? {};
+  const name =
+    (typeof meta.full_name === "string" && meta.full_name) ||
+    (typeof meta.name === "string" && meta.name) ||
+    (u.email ? u.email.split("@")[0] : "Traveller");
+  return { name, email: u.email ?? "" };
+}
+
+/** Turn Supabase's terse auth errors into copy that fits the brand voice. */
+function friendly(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("invalid login credentials"))
+    return "That email or password doesn't match. Please try again.";
+  if (m.includes("already registered") || m.includes("already been registered"))
+    return "An account with this email already exists. Try logging in.";
+  if (m.includes("password should be at least"))
+    return "Password must be at least 6 characters.";
+  if (m.includes("unable to validate email") || m.includes("invalid email"))
+    return "Please enter a valid email address.";
+  return message;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try {
-      const email = localStorage.getItem(SESSION_KEY);
-      if (email) {
-        const found = readUsers().find((u) => u.email === email);
-        if (found) setUser({ name: found.name, email: found.email });
-      }
-    } catch {
-      /* ignore */
+    if (!supabaseConfigured) {
+      setReady(true);
+      return;
     }
-    setReady(true);
+    const supabase = createClient();
+    // getUser() re-validates the JWT with Supabase (getSession would not).
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(toUser(data.user));
+      setReady(true);
+    });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(toUser(session?.user ?? null));
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   const signup = useCallback(
     async (name: string, email: string, password: string) => {
-      const e = normEmail(email);
       const n = name.trim();
       if (!n) throw new Error("Please enter your name.");
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
-        throw new Error("Please enter a valid email address.");
-      if (password.length < 6)
-        throw new Error("Password must be at least 6 characters.");
-      const users = readUsers();
-      if (users.some((u) => u.email === e))
-        throw new Error("An account with this email already exists. Try logging in.");
-      const hash = await hashPassword(password);
-      users.push({ name: n, email: e, hash });
-      writeUsers(users);
-      localStorage.setItem(SESSION_KEY, e);
-      setUser({ name: n, email: e });
+      if (!supabaseConfigured) throw new Error(NOT_CONFIGURED);
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: { full_name: n },
+          emailRedirectTo:
+            typeof window !== "undefined"
+              ? `${window.location.origin}/auth/callback`
+              : undefined,
+        },
+      });
+      if (error) throw new Error(friendly(error.message));
+      if (!data.session) {
+        // "Confirm email" is ON — no session until the link is clicked.
+        throw new Error(
+          "Almost there — we've emailed you a confirmation link. Confirm it, then log in.",
+        );
+      }
+      setUser(toUser(data.user));
     },
     [],
   );
 
   const login = useCallback(async (email: string, password: string) => {
-    const e = normEmail(email);
-    const found = readUsers().find((u) => u.email === e);
-    if (!found) throw new Error("No account found for this email. Please sign up.");
-    const hash = await hashPassword(password);
-    if (hash !== found.hash) throw new Error("Incorrect password. Please try again.");
-    localStorage.setItem(SESSION_KEY, e);
-    setUser({ name: found.name, email: found.email });
+    if (!supabaseConfigured) throw new Error(NOT_CONFIGURED);
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    if (error) throw new Error(friendly(error.message));
+    setUser(toUser(data.user));
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(SESSION_KEY);
-    setUser(null);
+    setUser(null); // optimistic — the onAuthStateChange listener confirms it
+    if (supabaseConfigured) createClient().auth.signOut().catch(() => {});
   }, []);
 
   const value = useMemo(

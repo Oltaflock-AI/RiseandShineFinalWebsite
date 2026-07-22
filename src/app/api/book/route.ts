@@ -1,32 +1,41 @@
-import { bookFlight, type BookingRequest } from "@/lib/tbo-book";
-import { normalizeTitle, type PaxType } from "@/lib/tbo-validate";
+import { bookFlight } from "@/lib/tbo-book";
+import { parseBookingRequest, type IncomingBooking } from "@/lib/booking-request";
+import { getUser } from "@/lib/supabase/server";
+import { saveBookingHistory } from "@/lib/booking-history";
+import {
+  razorpayConfigured,
+  verifyPaymentSignature,
+  fetchPayment,
+  fetchOrder,
+  refundPayment,
+} from "@/lib/razorpay";
 
 // Live TBO booking calls — never cached, and Book/Ticket can run to 300s.
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-type Incoming = {
-  traceId?: string;
-  searchedAt?: number;
-  resultIndex?: string;
-  isLCC?: boolean;
-  airlineCode?: string;
-  flightNumber?: string;
-  origin?: string;
-  destination?: string;
-  departDate?: string;
-  isInternational?: boolean;
-  passengers?: Array<Record<string, unknown>>;
-  gst?: BookingRequest["gst"];
+type Payment = { orderId?: string; paymentId?: string; signature?: string };
+
+/** The booking payload plus the Razorpay handles from a completed checkout. */
+type Incoming = IncomingBooking & {
+  /** Required when payment is configured; carries the signed order/payment ids. */
+  payment?: Payment;
 };
 
+/** A payment we have independently confirmed captured, kept so we can refund it if TBO fails. */
+type ConfirmedPayment = { paymentId: string; orderId: string; amountInr: number };
+
 /**
- * POST /api/book — run TBO's booking flow for a searched fare.
+ * POST /api/book — collect payment (when configured) then run TBO's booking flow.
  *
- * The heavy lifting (and every checklist validation) is in lib/tbo-book +
- * lib/tbo-validate; this handler only shapes the request and normalizes titles,
- * since TBO rejects "Master"/"Miss" outright.
+ * When Razorpay is configured a captured, signature-verified payment is REQUIRED
+ * before a single TBO call is made — and if ticketing then fails, the payment is
+ * refunded automatically (money must never be held for a ticket the customer never
+ * got). With no keys, the flow degrades to the legacy direct-ticket path so dev/
+ * staging still demo. The heavy lifting (and every TBO checklist validation) lives
+ * in lib/tbo-book + lib/tbo-validate; this handler shapes the request, normalizes
+ * titles (TBO rejects "Master"/"Miss"), and owns the payment lifecycle.
  */
 export async function POST(req: Request) {
   let body: Incoming;
@@ -36,39 +45,82 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const required = ["traceId", "resultIndex", "origin", "destination", "departDate"] as const;
-  for (const k of required) {
-    if (!body[k]) return Response.json({ ok: false, error: `Missing "${k}".` }, { status: 400 });
-  }
-  if (!body.passengers?.length) {
-    return Response.json({ ok: false, error: "At least one passenger is required." }, { status: 400 });
+  const parsed = parseBookingRequest(body);
+  if (!parsed.ok) return Response.json({ ok: false, error: parsed.error }, { status: parsed.status });
+  const bookingReq = parsed.req;
+
+  // ── Payment gate ──
+  // Confirm the money is actually captured BEFORE touching TBO. The order was priced
+  // server-side (/api/payment/order), so the order's amount — not any client number —
+  // is the amount we accept.
+  let payment: ConfirmedPayment | null = null;
+  if (razorpayConfigured) {
+    const p = body.payment;
+    if (!p?.orderId || !p?.paymentId || !p?.signature) {
+      return Response.json({ ok: false, error: "Payment is required before ticketing." }, { status: 402 });
+    }
+    if (!verifyPaymentSignature({ orderId: p.orderId, paymentId: p.paymentId, signature: p.signature })) {
+      return Response.json({ ok: false, error: "Payment could not be verified." }, { status: 400 });
+    }
+    try {
+      const [pay, order] = await Promise.all([fetchPayment(p.paymentId), fetchOrder(p.orderId)]);
+      const captured = pay.status === "captured" && pay.order_id === p.orderId && pay.amount === order.amount;
+      if (!captured) {
+        return Response.json({ ok: false, error: "Payment has not been captured." }, { status: 402 });
+      }
+      payment = { paymentId: pay.id, orderId: order.id, amountInr: Math.round(pay.amount / 100) };
+    } catch (e) {
+      console.error("[api/book] payment verification failed:", e);
+      return Response.json(
+        { ok: false, error: e instanceof Error ? e.message : "Payment verification failed." },
+        { status: 502 },
+      );
+    }
   }
 
-  const passengers = body.passengers.map((p) => {
-    const paxType = (Number(p.PaxType) || 1) as PaxType;
-    const gender = (Number(p.Gender) === 2 ? 2 : 1) as 1 | 2;
-    return {
-      ...p,
-      PaxType: paxType,
-      Gender: gender,
-      Title: normalizeTitle(String(p.Title ?? ""), paxType, gender),
-    };
-  }) as BookingRequest["passengers"];
+  const result = await bookFlight(bookingReq);
 
-  const result = await bookFlight({
-    traceId: body.traceId!,
-    searchedAt: body.searchedAt ?? Date.now(),
-    resultIndex: body.resultIndex!,
-    isLCC: Boolean(body.isLCC),
-    airlineCode: (body.airlineCode ?? "").toUpperCase(),
-    flightNumber: body.flightNumber ?? "",
-    origin: body.origin!.toUpperCase(),
-    destination: body.destination!.toUpperCase(),
-    departDate: body.departDate!,
-    isInternational: Boolean(body.isInternational),
-    passengers,
-    gst: body.gst,
-  });
+  // Paid but NOT ticketed → refund immediately. This is the whole point of capturing
+  // up front: the customer is never left out of pocket for a ticket they didn't get.
+  if (payment && !result.ok) {
+    try {
+      await refundPayment(payment.paymentId, {
+        notes: { reason: "ticketing_failed", traceId: bookingReq.traceId, orderId: payment.orderId },
+      });
+      return Response.json(
+        { ...result, refunded: true, error: `${result.error ?? "Booking failed."} Your payment has been refunded.` },
+        { status: result.rule ? 422 : 502 },
+      );
+    } catch (e) {
+      // A failed refund must be loud — it needs manual settlement.
+      console.error("[api/book] REFUND FAILED after ticketing failure — settle manually:", {
+        paymentId: payment.paymentId,
+        orderId: payment.orderId,
+        error: e,
+      });
+      return Response.json(
+        {
+          ...result,
+          refunded: false,
+          error: `${result.error ?? "Booking failed."} Your payment could not be auto-refunded — our team will process it manually.`,
+        },
+        { status: 502 },
+      );
+    }
+  }
+
+  // Ticket confirmed (and paid): mirror it to the customer's account. Best-effort and
+  // awaited BEFORE responding — on serverless the function may freeze the instant we
+  // return, so a fire-and-forget write could be killed. A failure here is swallowed:
+  // it must never fail a paid booking. Guests (no session) are simply not persisted.
+  if (result.ok) {
+    try {
+      const user = await getUser();
+      if (user) await saveBookingHistory(user.id, bookingReq, result, payment ?? undefined);
+    } catch (e) {
+      console.error("[api/book] booking-history write failed (ticket unaffected):", e);
+    }
+  }
 
   // A failed validation is the caller's fault (422); a held/failed booking is not (200/502).
   const status = result.ok ? 200 : result.rule ? 422 : 502;

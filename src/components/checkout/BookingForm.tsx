@@ -7,6 +7,54 @@ import { PlaneLoader } from "@/components/ui/PlaneLoader";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
+// ── Razorpay Checkout (hosted script) ──
+type RzpResponse = {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+};
+type RzpOptions = {
+  key: string;
+  order_id: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description?: string;
+  prefill?: { name?: string; email?: string; contact?: string };
+  notes?: Record<string, string>;
+  theme?: { color?: string };
+  handler: (r: RzpResponse) => void;
+  modal?: { ondismiss?: () => void };
+};
+type RzpInstance = { open: () => void; on: (e: string, cb: (r: { error?: { description?: string } }) => void) => void };
+declare global {
+  interface Window {
+    Razorpay?: new (o: RzpOptions) => RzpInstance;
+  }
+}
+
+const RZP_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+
+/** Inject Razorpay's hosted checkout.js once; resolves false if it can't load. */
+function loadRazorpay(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if (window.Razorpay) return resolve(true);
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${RZP_SRC}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(true), { once: true });
+      existing.addEventListener("error", () => resolve(false), { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = RZP_SRC;
+    s.async = true;
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
+
 /** Titles TBO accepts (Navitaire 4X). "Master"/"Miss" are rejected. */
 const TITLES: Record<PaxType, string[]> = {
   1: ["MR", "MRS", "MS"],
@@ -41,6 +89,7 @@ type Booked = {
   status?: number;
   invoiceNo?: string;
   ticketNumbers?: string[];
+  refunded?: boolean;
   error?: string;
   rule?: string;
 };
@@ -163,10 +212,9 @@ export function BookingForm({
     });
   }, [quote, booking, contact, gst, pax, needPassport, needFullPassport, needPan, needGst, now]);
 
-  async function submit() {
-    setBooking(true);
-    setBooked(null);
-    const passengers = pax.map((p, i) => {
+  /** Shape passengers into TBO's Pax objects from the current form state. */
+  function buildPassengers() {
+    return pax.map((p, i) => {
       const out: Record<string, unknown> = {
         Title: p.Title,
         FirstName: p.FirstName.trim(),
@@ -202,30 +250,50 @@ export function BookingForm({
       }
       return out;
     });
+  }
 
+  /** The booking payload shared by /api/payment/order (pre-charge) and /api/book. */
+  function commonPayload(passengers: ReturnType<typeof buildPassengers>) {
+    return {
+      traceId: b.traceId,
+      searchedAt: Number(b.searchedAt || Date.now()),
+      resultIndex: b.resultIndex,
+      isLCC: b.lcc === "1",
+      airlineCode: b.airlineCode,
+      flightNumber: (b.flightNo || "").replace(/\D/g, ""),
+      origin: b.from,
+      destination: b.to,
+      departDate: b.depart,
+      isInternational: isIntl,
+      passengers,
+      gst: needGst
+        ? {
+            GSTCompanyName: gst.GSTCompanyName,
+            GSTNumber: gst.GSTNumber,
+            GSTCompanyAddress: contact.address,
+            GSTCompanyEmail: contact.email,
+            GSTCompanyContactNumber: contact.phone,
+          }
+        : undefined,
+    };
+  }
+
+  /** POST /api/book — ticket the fare. `payment` is present once Razorpay has confirmed. */
+  async function sendToBook(
+    passengers: ReturnType<typeof buildPassengers>,
+    payment: RzpResponse | null,
+  ) {
     try {
       const r = await fetch("/api/book", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          traceId: b.traceId,
-          searchedAt: Number(b.searchedAt || Date.now()),
-          resultIndex: b.resultIndex,
-          isLCC: b.lcc === "1",
-          airlineCode: b.airlineCode,
-          flightNumber: (b.flightNo || "").replace(/\D/g, ""),
-          origin: b.from,
-          destination: b.to,
-          departDate: b.depart,
-          isInternational: isIntl,
-          passengers,
-          gst: needGst
+          ...commonPayload(passengers),
+          payment: payment
             ? {
-                GSTCompanyName: gst.GSTCompanyName,
-                GSTNumber: gst.GSTNumber,
-                GSTCompanyAddress: contact.address,
-                GSTCompanyEmail: contact.email,
-                GSTCompanyContactNumber: contact.phone,
+                orderId: payment.razorpay_order_id,
+                paymentId: payment.razorpay_payment_id,
+                signature: payment.razorpay_signature,
               }
             : undefined,
         }),
@@ -236,6 +304,90 @@ export function BookingForm({
     } finally {
       setBooking(false);
     }
+  }
+
+  /**
+   * Collect payment (Razorpay), then ticket. Money is captured BEFORE we call TBO;
+   * the server refunds automatically if ticketing then fails. If online payment isn't
+   * configured (503), fall back to ticketing directly — dev/staging without keys.
+   */
+  async function submit() {
+    setBooking(true);
+    setBooked(null);
+    const passengers = buildPassengers();
+
+    let order: {
+      ok: boolean;
+      orderId?: string;
+      amount?: number;
+      currency?: string;
+      keyId?: string;
+      error?: string;
+      rule?: string;
+    };
+    try {
+      // The order endpoint runs the FULL pre-ticket validation before creating an
+      // order, so a booking TBO would reject fails here — before any money is taken.
+      const r = await fetch("/api/payment/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(commonPayload(passengers)),
+      });
+      if (r.status === 503) {
+        // Payments not configured — legacy direct-ticket path.
+        await sendToBook(passengers, null);
+        return;
+      }
+      order = await r.json();
+    } catch {
+      setBooked({ ok: false, error: "Could not start payment. Please try again." });
+      setBooking(false);
+      return;
+    }
+
+    if (!order.ok || !order.orderId || !order.keyId) {
+      // Includes a 422 pre-charge validation failure (order.rule) — nothing was charged.
+      setBooked({ ok: false, error: order.error ?? "Could not start payment.", rule: order.rule });
+      setBooking(false);
+      return;
+    }
+
+    const ready = await loadRazorpay();
+    if (!ready || !window.Razorpay) {
+      setBooked({ ok: false, error: "Could not load the payment window. Check your connection and retry." });
+      setBooking(false);
+      return;
+    }
+
+    const rzp = new window.Razorpay({
+      key: order.keyId,
+      order_id: order.orderId,
+      amount: order.amount ?? 0,
+      currency: order.currency ?? "INR",
+      name: "Rise & Shine Travels",
+      description: `${b.from} → ${b.to} · ${b.airline}`,
+      prefill: { email: contact.email, contact: contact.phone },
+      notes: { traceId: b.traceId ?? "" },
+      theme: { color: "#e11d2a" },
+      handler: (resp) => {
+        // Paid — hand the signed handles to the server, which verifies then tickets.
+        void sendToBook(passengers, resp);
+      },
+      modal: {
+        ondismiss: () => {
+          setBooking(false);
+          setBooked({ ok: false, error: "Payment was cancelled — you have not been charged." });
+        },
+      },
+    });
+    rzp.on("payment.failed", (resp) => {
+      setBooking(false);
+      setBooked({
+        ok: false,
+        error: resp?.error?.description ?? "Payment failed — you have not been charged.",
+      });
+    });
+    rzp.open();
   }
 
   // ── states ──
@@ -536,14 +688,14 @@ export function BookingForm({
           >
             {booking ? (
               <>
-                <Loader2 size={15} className="animate-spin" aria-hidden /> Issuing ticket…
+                <Loader2 size={15} className="animate-spin" aria-hidden /> Processing…
               </>
             ) : (
               <>Pay ₹{inr.format(totalFare)} & issue ticket</>
             )}
           </button>
           <p className="mt-3 flex items-center justify-center gap-1.5 text-[0.72rem] text-muted">
-            <ShieldCheck size={13} aria-hidden /> Ticket issued instantly on payment
+            <ShieldCheck size={13} aria-hidden /> Secure payment via Razorpay · ticket issued on success
           </p>
         </div>
       </aside>

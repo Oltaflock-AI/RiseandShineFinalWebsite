@@ -231,7 +231,11 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
             </p>
 
             <p className="mt-6 text-center text-[0.75rem] leading-relaxed text-muted/80">
-              Demo account system for preview. Details are stored on this device only.
+              Your details are kept private and secure. By continuing you agree to our{" "}
+              <Link href="/terms" className="font-medium text-red hover:underline">
+                Terms
+              </Link>
+              .
             </p>
           </div>
         </div>

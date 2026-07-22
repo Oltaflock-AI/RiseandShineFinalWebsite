@@ -14,15 +14,18 @@ export function BookButton({
   query,
   label = "Book",
   className,
+  path = "/checkout",
 }: {
   query: Record<string, string>;
   label?: string;
   className?: string;
+  /** Checkout route to open (defaults to the flights checkout). */
+  path?: string;
 }) {
   const router = useRouter();
   const { user, ready } = useAuth();
 
-  const checkout = `/checkout?${new URLSearchParams(query).toString()}`;
+  const checkout = `${path}?${new URLSearchParams(query).toString()}`;
 
   const onClick = () => {
     if (user) router.push(checkout);

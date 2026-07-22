@@ -18,10 +18,10 @@ import {
   Plane,
   PlaneTakeoff,
   Plus,
-  Sparkles,
   Users,
 } from "lucide-react";
 import { AIRPORTS } from "@/data/airports";
+import { HOTEL_CITIES } from "@/data/hotel-cities";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { cn } from "@/lib/cn";
@@ -53,6 +53,8 @@ export type SearchInitial = {
   airline?: string;
   nonstop?: string;
   trip?: "oneway" | "round";
+  /** Which product tab to open on ("flights" default). */
+  product?: "flights" | "hotels";
 };
 
 function Field({
@@ -134,7 +136,7 @@ export function SearchBar({
   const router = useRouter();
   const listId = useId();
 
-  const [product, setProduct] = useState<"flights" | "hotels">("flights");
+  const [product, setProduct] = useState<"flights" | "hotels">(initial?.product ?? "flights");
   const [trip, setTrip] = useState<"oneway" | "round">(initial?.trip ?? "oneway");
   const [from, setFrom] = useState(initial?.from || "Ahmedabad (AMD)");
   const [to, setTo] = useState(initial?.to ?? "");
@@ -419,7 +421,7 @@ export function SearchBar({
           <ArrowRightLeft size={13} aria-hidden />
           {product === "flights"
             ? "Live fares across 500+ airlines, powered by our booking system."
-            : "Live hotel booking is coming soon — send your stay and we'll price it for you."}
+            : "Live hotel rates for popular destinations, powered by our booking system."}
         </p>
       </Container>
 
@@ -436,6 +438,7 @@ export function SearchBar({
 
 function HotelsPanel() {
   const router = useRouter();
+  const cityListId = useId();
   const [city, setCity] = useState("");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
@@ -447,20 +450,27 @@ function HotelsPanel() {
     setCheckOut((d) => d || iso(16));
   }, []);
 
-  const enquire = (e: React.FormEvent) => {
+  const search = (e: React.FormEvent) => {
     e.preventDefault();
-    const p = new URLSearchParams({ service: "Hotel" });
-    if (city.trim()) p.set("destination", city.trim());
-    router.push(`/plan-my-trip?${p.toString()}`);
+    // Map the typed destination to a known TBO city slug when we can; otherwise
+    // pass the raw text and let the results page resolve it.
+    const q = city.trim().toLowerCase();
+    const match =
+      HOTEL_CITIES.find((c) => c.slug === q || c.label.toLowerCase() === q) ||
+      HOTEL_CITIES.find((c) => c.label.toLowerCase().includes(q) && q.length > 1);
+    const p = new URLSearchParams();
+    p.set("city", match ? match.slug : city.trim());
+    if (checkIn) p.set("checkIn", checkIn);
+    if (checkOut) p.set("checkOut", checkOut);
+    p.set("rooms", "1");
+    p.set("adults", "2");
+    router.push(`/hotels?${p.toString()}`);
   };
 
   return (
-    <form onSubmit={enquire} aria-label="Hotel enquiry">
+    <form onSubmit={search} aria-label="Hotel search">
       <div className="flex items-center gap-2 border-b border-line px-5 pb-3 pt-4">
         <span className="text-[0.9rem] font-bold text-ink">Find a Hotel</span>
-        <span className="inline-flex items-center gap-1 rounded-full bg-red/10 px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide text-red">
-          <Sparkles size={12} aria-hidden /> Coming soon
-        </span>
       </div>
       <div className="relative grid lg:grid-cols-[1.6fr_1fr_1fr_1.1fr_auto]">
         <span className="grad-red absolute inset-y-0 left-0 hidden w-[6px] lg:block" aria-hidden />
@@ -470,11 +480,17 @@ function HotelsPanel() {
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              placeholder="City, area or hotel"
+              placeholder="City (e.g. Delhi, Mumbai, Dubai)"
               aria-label="Hotel destination"
+              list={cityListId}
               className={inputCls}
             />
           </label>
+          <datalist id={cityListId}>
+            {HOTEL_CITIES.map((c) => (
+              <option key={c.slug} value={c.label} />
+            ))}
+          </datalist>
         </Field>
         <Field label="Check-in">
           <div className="flex items-center gap-2">
@@ -496,7 +512,7 @@ function HotelsPanel() {
         </Field>
         <div className="grid place-items-center p-3.5">
           <Button type="submit" arrow fullWidth>
-            Request Quote
+            Search Hotels
           </Button>
         </div>
       </div>

@@ -250,6 +250,8 @@ export type BookingResult = {
   status?: number;
   invoiceNo?: string;
   ticketNumbers?: string[];
+  /** Confirmed total fare (INR) from the ticketed itinerary, for the mirror row. */
+  fareInr?: number;
   priceChanged?: boolean;
   newFare?: number;
   error?: string;
@@ -338,77 +340,124 @@ export async function quoteFare(args: {
   }
 }
 
+type PreparedBooking = {
+  passengers: Pax[];
+  dupKey: string;
+  priceChanged: boolean;
+  newFare?: number;
+  /** Confirmed FareQuote total (all pax) — the amount to charge / display. */
+  publishedFare?: number;
+};
+
+/**
+ * Everything up to (but NOT including) Book/Ticket: TraceId window, FareRule +
+ * FareQuote, every checklist validation, free-SSR selection, the per-pax fare split,
+ * and the duplicate guard. Throws (TboValidationError / TboError) on the first problem.
+ *
+ * Shared by bookFlight and validateBooking so the checks a booking must pass are
+ * IDENTICAL whether we're pre-validating (before charging the card) or actually
+ * ticketing. It commits no booking — `rememberBooking` stays in bookFlight, after Book
+ * succeeds — so running it twice (once to pre-validate, once to ticket) is safe.
+ */
+async function prepareBooking(req: BookingRequest): Promise<PreparedBooking> {
+  assertTraceAlive(req.searchedAt);
+
+  // 1. FareRule (informational, part of the mandated flow)
+  await call(`${SEARCH_SVC}/FareRule`, { TraceId: req.traceId, ResultIndex: req.resultIndex }, TIMEOUT_OTHER, 2);
+
+  // 2. FareQuote — the source of truth for PAN/passport/GST/price-change flags
+  const fqRes = await call(`${SEARCH_SVC}/FareQuote`, { TraceId: req.traceId, ResultIndex: req.resultIndex }, TIMEOUT_OTHER, 2);
+  const FQ = assertOk(fqRes, "FareQuote");
+  const quoted = (Array.isArray(FQ.Results) ? FQ.Results[0] : FQ.Results) as Json;
+  if (!quoted) throw new TboError("FareQuote returned no result — the fare is no longer available.");
+
+  const flags: FareQuoteFlags = {
+    IsPanRequiredAtBook: quoted.IsPanRequiredAtBook,
+    IsPanRequiredAtTicket: quoted.IsPanRequiredAtTicket,
+    IsPassportRequiredAtBook: quoted.IsPassportRequiredAtBook,
+    IsPassportRequiredAtTicket: quoted.IsPassportRequiredAtTicket,
+    IsPassportFullDetailRequiredAtBook: quoted.IsPassportFullDetailRequiredAtBook,
+    IsGSTMandatory: quoted.IsGSTMandatory,
+    IsPriceChanged: FQ.IsPriceChanged,
+    FlightDetailChangeInfo: quoted.FlightDetailChangeInfo,
+    isseatmandatory: quoted.IsSeatMandatory ?? quoted.isseatmandatory,
+    ismealmandatory: quoted.IsMealMandatory ?? quoted.ismealmandatory,
+  };
+
+  // Price / flight-detail changes: rebuild from the QUOTED fare, not the search fare.
+  const priceChanged = Boolean(FQ.IsPriceChanged);
+  const newFare = quoted?.Fare?.PublishedFare as number | undefined;
+
+  // 3. Validate everything TBO would reject at the supplier
+  validatePax(req.passengers as Pax[], { isLCC: req.isLCC, airlineCode: req.airlineCode });
+  validateGst(flags, req.gst);
+
+  // 4. SSR — free baggage/meal must be explicitly selected or they aren't applied
+  const ssrRes = await call(`${SEARCH_SVC}/SSR`, { TraceId: req.traceId, ResultIndex: req.resultIndex }, TIMEOUT_OTHER, 2);
+  const SSR = ssrRes?.Response ?? {};
+  const freeBags = pickFreeBaggage(SSR.Baggage);
+  const freeMeals = pickFreeMeal(SSR.MealDynamic ?? SSR.Meal);
+  // Special fares (Super 6E / SpiceMax) refuse to ticket without a seat + meal.
+  const freeSeats = flags.isseatmandatory ? pickFreeSeats(SSR.SeatDynamic) : [];
+  if (flags.isseatmandatory || flags.ismealmandatory) {
+    validateSpecialFare(flags, { seats: freeSeats, meals: freeMeals });
+  }
+
+  // 5. Build passengers: per-pax fare split + SSR on the lead pax
+  const breakdown = quoted.FareBreakdown as FareBreakdown[] | undefined;
+  const passengers = req.passengers.map((p, i) => {
+    const out: Pax = { ...(p as Pax), Fare: farePerPax(breakdown, p.PaxType) };
+    if (i === 0) {
+      if (freeBags.length) out.Baggage = freeBags; // both legs on a return sector
+      if (freeMeals.length) out.MealDynamic = freeMeals;
+      if (freeSeats.length) out.Seat = freeSeats;
+      if (req.gst) Object.assign(out, req.gst);
+    }
+    return out;
+  });
+
+  const stage: "Book" | "Ticket" = req.isLCC ? "Ticket" : "Book";
+  validatePanPassport(passengers, flags, stage);
+
+  // 6. Duplicate guard (non-LCC, 24h) — read-only here; committed in bookFlight after Book
+  const dupKey = duplicateKey({
+    origin: req.origin,
+    destination: req.destination,
+    departDate: req.departDate,
+    airlineCode: req.airlineCode,
+    flightNumber: req.flightNumber,
+    pax: passengers,
+  });
+  assertNotDuplicate(dupKey, req.isLCC);
+
+  return { passengers, dupKey, priceChanged, newFare, publishedFare: newFare };
+}
+
+export type ValidateResult =
+  | { ok: true; publishedFare?: number; isLCC: boolean; priceChanged: boolean }
+  | { ok: false; error: string; rule?: string };
+
+/**
+ * Dry-run the whole pre-ticket flow WITHOUT calling Book/Ticket. The checkout runs
+ * this BEFORE taking payment, so a booking TBO would reject (bad PAN/passport/GST,
+ * a duplicate, a mandatory-SSR fare) fails before the customer is ever charged —
+ * rather than being charged and then refunded. Returns the confirmed FareQuote total.
+ */
+export async function validateBooking(req: BookingRequest): Promise<ValidateResult> {
+  try {
+    const prep = await prepareBooking(req);
+    return { ok: true, publishedFare: prep.publishedFare, isLCC: req.isLCC, priceChanged: prep.priceChanged };
+  } catch (e) {
+    if (e instanceof TboValidationError) return { ok: false, error: e.message, rule: e.rule };
+    if (e instanceof TboError || e instanceof TboTimeoutError) return { ok: false, error: e.message };
+    return { ok: false, error: e instanceof Error ? e.message : "Could not validate this booking." };
+  }
+}
+
 export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
   try {
-    assertTraceAlive(req.searchedAt);
-
-    // 1. FareRule (informational, part of the mandated flow)
-    await call(`${SEARCH_SVC}/FareRule`, { TraceId: req.traceId, ResultIndex: req.resultIndex }, TIMEOUT_OTHER, 2);
-
-    // 2. FareQuote — the source of truth for PAN/passport/GST/price-change flags
-    const fqRes = await call(`${SEARCH_SVC}/FareQuote`, { TraceId: req.traceId, ResultIndex: req.resultIndex }, TIMEOUT_OTHER, 2);
-    const FQ = assertOk(fqRes, "FareQuote");
-    const quoted = (Array.isArray(FQ.Results) ? FQ.Results[0] : FQ.Results) as Json;
-    if (!quoted) throw new TboError("FareQuote returned no result — the fare is no longer available.");
-
-    const flags: FareQuoteFlags = {
-      IsPanRequiredAtBook: quoted.IsPanRequiredAtBook,
-      IsPanRequiredAtTicket: quoted.IsPanRequiredAtTicket,
-      IsPassportRequiredAtBook: quoted.IsPassportRequiredAtBook,
-      IsPassportRequiredAtTicket: quoted.IsPassportRequiredAtTicket,
-      IsPassportFullDetailRequiredAtBook: quoted.IsPassportFullDetailRequiredAtBook,
-      IsGSTMandatory: quoted.IsGSTMandatory,
-      IsPriceChanged: FQ.IsPriceChanged,
-      FlightDetailChangeInfo: quoted.FlightDetailChangeInfo,
-      isseatmandatory: quoted.IsSeatMandatory ?? quoted.isseatmandatory,
-      ismealmandatory: quoted.IsMealMandatory ?? quoted.ismealmandatory,
-    };
-
-    // Price / flight-detail changes: rebuild from the QUOTED fare, not the search fare.
-    const priceChanged = Boolean(FQ.IsPriceChanged);
-    const newFare = quoted?.Fare?.PublishedFare as number | undefined;
-
-    // 3. Validate everything TBO would reject at the supplier
-    validatePax(req.passengers as Pax[], { isLCC: req.isLCC, airlineCode: req.airlineCode });
-    validateGst(flags, req.gst);
-
-    // 4. SSR — free baggage/meal must be explicitly selected or they aren't applied
-    const ssrRes = await call(`${SEARCH_SVC}/SSR`, { TraceId: req.traceId, ResultIndex: req.resultIndex }, TIMEOUT_OTHER, 2);
-    const SSR = ssrRes?.Response ?? {};
-    const freeBags = pickFreeBaggage(SSR.Baggage);
-    const freeMeals = pickFreeMeal(SSR.MealDynamic ?? SSR.Meal);
-    // Special fares (Super 6E / SpiceMax) refuse to ticket without a seat + meal.
-    const freeSeats = flags.isseatmandatory ? pickFreeSeats(SSR.SeatDynamic) : [];
-    if (flags.isseatmandatory || flags.ismealmandatory) {
-      validateSpecialFare(flags, { seats: freeSeats, meals: freeMeals });
-    }
-
-    // 5. Build passengers: per-pax fare split + SSR on the lead pax
-    const breakdown = quoted.FareBreakdown as FareBreakdown[] | undefined;
-    const passengers = req.passengers.map((p, i) => {
-      const out: Pax = { ...(p as Pax), Fare: farePerPax(breakdown, p.PaxType) };
-      if (i === 0) {
-        if (freeBags.length) out.Baggage = freeBags; // both legs on a return sector
-        if (freeMeals.length) out.MealDynamic = freeMeals;
-        if (freeSeats.length) out.Seat = freeSeats;
-        if (req.gst) Object.assign(out, req.gst);
-      }
-      return out;
-    });
-
-    const stage: "Book" | "Ticket" = req.isLCC ? "Ticket" : "Book";
-    validatePanPassport(passengers, flags, stage);
-
-    // 6. Duplicate guard (non-LCC, 24h)
-    const dupKey = duplicateKey({
-      origin: req.origin,
-      destination: req.destination,
-      departDate: req.departDate,
-      airlineCode: req.airlineCode,
-      flightNumber: req.flightNumber,
-      pax: passengers,
-    });
-    assertNotDuplicate(dupKey, req.isLCC);
+    // Re-run all pre-ticket checks (parity with the pre-charge validation) then ticket.
+    const { passengers, dupKey, priceChanged, newFare } = await prepareBooking(req);
 
     let bookingId: number | undefined;
     let pnr: string | undefined;
@@ -492,6 +541,10 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
       status: itin?.Status,
       invoiceNo: itin?.InvoiceNo,
       ticketNumbers: tickets,
+      fareInr:
+        itin?.Fare?.PublishedFare != null
+          ? Math.round(Number(itin.Fare.PublishedFare))
+          : undefined,
       priceChanged,
       newFare,
       error:

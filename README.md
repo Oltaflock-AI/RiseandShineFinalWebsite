@@ -15,7 +15,7 @@ that lands leads in the agency's Google Sheet.
 | **Flight search** — live TBO staging (Authenticate → Search), real fares | ✅ Live (staging) |
 | **Flight booking** — FareRule → FareQuote → SSR → Book → Ticket → GetBookingDetails | ✅ Built, staging — **prod certification pending** |
 | Checkout — FareQuote-driven dynamic passenger form (asks for exactly what TBO requires) | ✅ Built |
-| Auth — login / signup / account | ⚠️ **Demo only** — client-side localStorage, **not secure** |
+| Auth — login / signup / account | ✅ **Supabase Auth** (email + password), server-verified sessions, RLS |
 | Enquiry forms → agency Google Form / Sheet | ✅ Live |
 | SEO — sitemap, robots, `TravelAgency` JSON-LD, legacy-URL 301s | ✅ Built |
 | Legal — terms & conditions, refund policy (privacy policy referenced within terms) | ✅ Built |
@@ -46,19 +46,36 @@ npm run lint     # eslint (next core-web-vitals + typescript)
 
 ### Environment (`.env.local`, git-ignored — never commit)
 
-Flight search/booking need TBO staging credentials. Without them the site still
-builds and renders; flight pages just report fares as unavailable.
+Copy `.env.local.example` → `.env.local` and fill in. The site still builds and
+runs with these blank: auth and flight features simply degrade gracefully.
 
 ```bash
+# Supabase — customer accounts (both keys are browser-safe; RLS protects data)
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+# SUPABASE_SERVICE_ROLE_KEY=...   # server-only, for writing booking history later
+
+# TBO — flight search + booking
 TBO_CLIENT_ID=...        # TBO client id
 TBO_USERNAME=...         # TBO API username
 TBO_PASSWORD=...         # TBO API password
 TBO_END_USER_IP=...      # IP whitelisted with TBO (defaults to a staging IP)
-# Optional: override the Book/Ticket service URL if TBO provisions AirBook.
-# TBO_BOOK_URL=http://api.tektravels.com/BookingEngineService_AirBook/AirService.svc/rest
+# TBO_BOOK_URL=...       # optional: override Book/Ticket URL if TBO provisions AirBook
 ```
 
-Reference credentials + endpoint notes live in `reference/api-setup/` — **git-ignored**.
+TBO reference credentials + endpoint notes live in `reference/api-setup/` — **git-ignored**.
+
+### Supabase setup (one-time)
+
+1. Create a project (region **ap-south-1 / Mumbai** for India latency + residency).
+2. **Project Settings → API** → copy the URL + anon key into `.env.local`.
+3. Run `supabase/migrations/0001_init.sql` in the **SQL Editor** (creates
+   `profiles`/`bookings`/`passengers`/`travellers`/`enquiries` + RLS + the
+   auto-profile trigger). Or with the CLI: `supabase db push`.
+4. **Auth → Providers → Email:** turn **off** "Confirm email" for instant
+   login-after-signup (matches the current UX); leave it on and signup prompts
+   the user to confirm via the emailed link (handled by `/auth/callback`).
+5. **Auth → URL Configuration:** add your deploy origin(s) to redirect URLs.
 
 ## Routes
 
@@ -79,20 +96,23 @@ plus `sitemap.xml`, `robots.txt`, `not-found`.
 
 ```
 src/
+  proxy.ts             Next 16 "middleware": refreshes Supabase session, gates /account
   app/                 routes (folder-per-page) + layout, sitemap, robots, not-found
     api/               flights (search), quote (FareQuote), book (booking) — server only
+    auth/callback/     exchanges the email-confirm / OAuth code for a session
   components/
     layout/            Header, HeaderAuth, Footer, WhatsAppFloat
     sections/          Hero, SearchBar, Marquee, PageHero, CTABand, Testimonials, …
     ui/                Button, Icon, PackageCard, FlightCard, LiveFare, Reveal, Counter, …
     forms/             ContactForm, PlanTripForm, shared controls
-    auth/              AuthScreen, AccountView  (demo auth UI)
+    auth/              AuthScreen, AccountView  (login/signup/account UI)
     checkout/          CheckoutView, BookingForm (TBO passenger form)
   lib/
+    supabase/          browser + server Supabase clients (@supabase/ssr)
+    auth.tsx           useAuth() provider — Supabase Auth, session + onAuthStateChange
     tbo.ts             TBO client — auth + Search, normalized fares (server only)
     tbo-book.ts        TBO booking flow: FareRule→FareQuote→SSR→Book→Ticket→GetBookingDetails
     tbo-validate.ts    every TBO certification-checklist validation + normalizers
-    auth.tsx           ⚠️ demo localStorage auth provider (useAuth)
     actions.ts         "use server" enquiry handler → Google Form
     googleForm.ts      Lead → Google Form field mapping
     cn.ts              className helper
@@ -102,6 +122,7 @@ src/
     itineraries/       lighter itinerary content
     packages.ts services.ts testimonials.ts accreditations.ts content.ts
     airports.ts airlineLogos.ts
+supabase/migrations/   0001_init.sql — accounts schema + RLS (run in Supabase)
 public/brand/          logo (red + white), favicons, OG image
 reference/             source material + TBO live creds/notes — git-ignored, NOT deployed
 ```
@@ -135,9 +156,10 @@ PAN/passport/GST rules, special-fare seat+meal, duplicate guard). Reference:
 ## Before production launch
 
 - **TBO:** complete production certification and switch endpoints/creds from staging.
-- **Auth:** `lib/auth.tsx` is a client-side demo (localStorage, SHA-256, no server).
-  Replace its internals with real server-side auth before taking payments — the
-  `useAuth()` API is designed to stay the same.
+- **Auth:** real now — Supabase Auth (email + password) with server-verified
+  sessions and RLS. `useAuth()` (in `lib/auth.tsx`) is unchanged for consumers;
+  add OAuth providers / password reset when needed. Persisting booking history to
+  the `bookings` table (server-side, service-role key) is the next wiring step.
 - **Payments:** not integrated. Booking currently ticket on TBO's staging credit.
 - **Business data:** verify `TODO`s in `src/data/site.ts` (GSTIN, socials, reviews URL, domain `url`).
 - **Images:** marketing photos load from Unsplash (allowed in `next.config.ts`).
