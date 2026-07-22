@@ -1,0 +1,229 @@
+// Server-side ElevenLabs Conversational AI client for the Rise & Shine Travel
+// demo. ElevenLabs is the single source of truth — we place outbound calls over
+// the VoBiz SIP trunk and read every call's transcript, summary and collected
+// fields straight back from the conversation API. No database or webhook needed.
+//
+// NEVER import this from a client component (it uses the secret API key).
+
+import type { CallRecord, TranscriptTurn, TripFields } from "./types";
+
+const API_BASE = "https://api.elevenlabs.io/v1/convai";
+
+export const AGENT_ID =
+  process.env.ELEVENLABS_AGENT_ID || "agent_6901kth2msjxf0wtnxwwgpp9an03";
+
+export const PHONE_NUMBER_ID =
+  process.env.ELEVENLABS_PHONE_NUMBER_ID || "phnum_9601kt8sme2pfvbtgw01j78kfgkn";
+
+function apiKey(): string {
+  // ELEVENLABS_API_KEY is preferred; ELEVEN_API (the original .env name) works too.
+  const k = process.env.ELEVENLABS_API_KEY || process.env.ELEVEN_API;
+  if (!k) throw new Error("ELEVENLABS_API_KEY / ELEVEN_API is not set");
+  return k;
+}
+
+// Normalise an Indian number to E.164. 10 digits → +91; already-prefixed kept.
+export function normalisePhone(raw: string): string {
+  const trimmed = (raw || "").trim();
+  if (trimmed.startsWith("+")) return "+" + trimmed.slice(1).replace(/[^\d]/g, "");
+  const digits = trimmed.replace(/[^\d]/g, "");
+  if (digits.length === 10) return "+91" + digits;
+  if (digits.length === 12 && digits.startsWith("91")) return "+" + digits;
+  if (digits.length === 11 && digits.startsWith("0")) return "+91" + digits.slice(1);
+  return "+" + digits;
+}
+
+// ── Place an outbound call ──────────────────────────────────────────────────
+export interface OutboundResult {
+  success: boolean;
+  message?: string;
+  conversation_id: string | null;
+  sip_call_id: string | null;
+}
+
+export async function placeOutboundCall(opts: {
+  toNumber: string;
+  calleeName: string;
+}): Promise<OutboundResult> {
+  const to = normalisePhone(opts.toNumber);
+  // The agent's first message uses {{callee_name}} and the prompt uses
+  // {{mobile_number}} — both must be supplied or the call fails instantly.
+  const dynamic_variables: Record<string, string> = {
+    callee_name: opts.calleeName?.trim() || "ग्राहक",
+    mobile_number: to,
+  };
+
+  const body = {
+    agent_id: AGENT_ID,
+    agent_phone_number_id: PHONE_NUMBER_ID,
+    to_number: to,
+    conversation_initiation_client_data: { dynamic_variables },
+  };
+
+  const res = await fetch(`${API_BASE}/sip-trunk/outbound-call`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = json?.detail?.message || json?.message || `outbound-call ${res.status}`;
+    throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+  }
+  return {
+    success: json?.success ?? true,
+    message: json?.message,
+    conversation_id: json?.conversation_id ?? null,
+    sip_call_id: json?.sip_call_id ?? null,
+  };
+}
+
+// ── Live call status (drives the Ringing → Connected → Ended indicator) ─────
+export type CallPhase = "ringing" | "connected" | "ended" | "failed" | "unknown";
+
+export interface LiveCallStatus {
+  conversation_id: string;
+  status: string;
+  phase: CallPhase;
+  accepted: boolean;
+  duration_secs: number | null;
+}
+
+function phaseFor(status: string, accepted: boolean): CallPhase {
+  switch (status) {
+    case "initiated":
+      return accepted ? "connected" : "ringing";
+    case "in-progress":
+      return "connected";
+    case "processing":
+    case "done":
+      return "ended";
+    case "failed":
+      return "failed";
+    default:
+      return "unknown";
+  }
+}
+
+export async function getLiveCallStatus(conversationId: string): Promise<LiveCallStatus> {
+  const res = await fetch(`${API_BASE}/conversations/${conversationId}`, {
+    headers: { "xi-api-key": apiKey() },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`conversation ${res.status}`);
+  const d = await res.json();
+  const m = d?.metadata ?? {};
+  const status: string = d?.status ?? "unknown";
+  const accepted = m?.accepted_time_unix_secs != null || status === "in-progress";
+  return {
+    conversation_id: conversationId,
+    status,
+    phase: phaseFor(status, accepted),
+    accepted,
+    duration_secs: m?.call_duration_secs ?? null,
+  };
+}
+
+// ── Read calls back for the dashboard ───────────────────────────────────────
+function dcValue(dcr: Record<string, unknown>, key: string): string | null {
+  const entry = dcr?.[key] as Record<string, unknown> | undefined;
+  if (!entry) return null;
+  const v = entry && typeof entry === "object" && "value" in entry ? entry.value : entry;
+  if (v === null || v === undefined || v === "") return null;
+  return String(v);
+}
+
+function mapConversation(d: Record<string, any>): CallRecord {
+  const m = d?.metadata ?? {};
+  const a = d?.analysis ?? {};
+  const dcr = (a?.data_collection_results ?? {}) as Record<string, unknown>;
+  const dyn = d?.conversation_initiation_client_data?.dynamic_variables ?? {};
+  const phoneCall = m?.phone_call ?? {};
+
+  const fields: TripFields = {
+    destination: dcValue(dcr, "destination"),
+    num_travelers: dcValue(dcr, "num_travelers"),
+    travel_month: dcValue(dcr, "travel_month"),
+    special_requests: dcValue(dcr, "special_requests"),
+    whatsapp_number: dcValue(dcr, "whatsapp_number"),
+    callback_time: dcValue(dcr, "callback_time"),
+  };
+
+  const name =
+    (dyn.callee_name && String(dyn.callee_name).trim()) || dcValue(dcr, "lead_name") || null;
+  const phone =
+    (dyn.mobile_number && String(dyn.mobile_number).trim()) ||
+    phoneCall.external_number ||
+    phoneCall.to_number ||
+    fields.whatsapp_number ||
+    null;
+
+  const qualifiedRaw = dcr?.["lead_qualified"] as Record<string, unknown> | undefined;
+  const qualified =
+    qualifiedRaw && "value" in qualifiedRaw && typeof qualifiedRaw.value === "boolean"
+      ? (qualifiedRaw.value as boolean)
+      : null;
+
+  const transcript: TranscriptTurn[] = Array.isArray(d?.transcript)
+    ? d.transcript
+        .map((t: Record<string, any>) => ({
+          role: String(t?.role ?? "agent"),
+          text: String(t?.message ?? ""),
+          secs: t?.time_in_call_secs ?? null,
+        }))
+        .filter((t: TranscriptTurn) => t.text.trim() !== "")
+    : [];
+
+  return {
+    conversation_id: d?.conversation_id,
+    name,
+    phone,
+    status: d?.status ?? "unknown",
+    call_successful: a?.call_successful ?? null,
+    title: a?.call_summary_title ?? null,
+    summary: a?.transcript_summary ?? null,
+    duration_secs: m?.call_duration_secs ?? null,
+    started_at_unix: m?.start_time_unix_secs ?? null,
+    language: m?.main_language ?? null,
+    qualified,
+    fields,
+    transcript,
+  };
+}
+
+async function getConversationDetail(id: string): Promise<CallRecord | null> {
+  const res = await fetch(`${API_BASE}/conversations/${id}`, {
+    headers: { "xi-api-key": apiKey() },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const d = await res.json().catch(() => null);
+  if (!d) return null;
+  return mapConversation(d);
+}
+
+// List recent conversations for our agent, then hydrate each with its full
+// detail (summary + collected fields) in parallel. Plenty fast for a demo.
+//
+// ISOLATION: the API key has workspace-wide access — it can technically see every
+// agent in the workspace (e.g. the Sarthak Singapore agent). We query by agent_id
+// so ElevenLabs only returns THIS agent's calls, and we ALSO defensively drop any
+// row whose agent_id isn't ours. Result: this dashboard can never show another
+// agent's calls, regardless of which API key is used.
+export async function listCalls(limit = 30): Promise<CallRecord[]> {
+  const res = await fetch(
+    `${API_BASE}/conversations?agent_id=${AGENT_ID}&page_size=${limit}`,
+    { headers: { "xi-api-key": apiKey() }, cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`conversations ${res.status}`);
+  const data = await res.json();
+  const list: Record<string, any>[] = (data?.conversations ?? []).filter(
+    (c: Record<string, any>) => c?.agent_id === AGENT_ID,
+  );
+  const details = await Promise.all(
+    list.map((c) => getConversationDetail(c.conversation_id).catch(() => null)),
+  );
+  return details.filter((c): c is CallRecord => c !== null);
+}

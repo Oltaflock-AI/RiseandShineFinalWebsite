@@ -1,0 +1,3 @@
+# The voice agent lives in this repo but is a separate app.
+# Keep it out of the marketing-site Vercel build/deploy.
+voice-agent/
