@@ -90,22 +90,25 @@ export default async function HotelDetailPage({
 
   // Static content is independent of dates; rooms need a stay window.
   const hasStay = Boolean(sp.checkIn && sp.checkOut && sp.checkOut > sp.checkIn!);
-  const [info, res] = await Promise.all([
+  const searchArgs = {
+    checkInISO: sp.checkIn!,
+    checkOutISO: sp.checkOut!,
+    hotelCodes: [code],
+    nationality: "IN",
+    rooms: Array.from({ length: rooms }, () => ({
+      adults: adultsPerRoom,
+      childrenAges: childAges.length ? childAges : undefined,
+    })),
+  };
+  let [info, res] = await Promise.all([
     hotelInfo(code),
-    hasStay
-      ? searchHotels({
-          checkInISO: sp.checkIn!,
-          checkOutISO: sp.checkOut!,
-          hotelCodes: [code],
-          nationality: "IN",
-          rooms: Array.from({ length: rooms }, () => ({
-            adults: adultsPerRoom,
-            childrenAges: childAges.length ? childAges : undefined,
-          })),
-          allRoomOptions: true,
-        })
-      : Promise.resolve(null),
+    hasStay ? searchHotels({ ...searchArgs, allRoomOptions: true }) : Promise.resolve(null),
   ]);
+  // TBO's staging occasionally returns an empty result transiently. Fall back to
+  // the capped search (what the results page priced) so the page stays bookable.
+  if (hasStay && (!res?.ok || !res.offers.length)) {
+    res = await searchHotels(searchArgs);
+  }
 
   const offer = res?.ok ? res.offers.find((o) => o.hotelCode === code) ?? res.offers[0] : undefined;
   const roomOptions = offer?.rooms ?? [];
