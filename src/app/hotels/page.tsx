@@ -33,6 +33,14 @@ export default async function HotelsPage({
   const city = resolveCity(sp.city);
   const rooms = Math.min(6, Math.max(1, parseInt(sp.rooms || "1", 10) || 1));
   const adultsPerRoom = Math.min(8, Math.max(1, parseInt(sp.adults || "2", 10) || 2));
+  // Children per room + their ages (uniform per room, ages comma-joined in the URL).
+  const childrenPerRoom = Math.min(4, Math.max(0, parseInt(sp.children || "0", 10) || 0));
+  const childAges = (sp.ages || "")
+    .split(",")
+    .map((a) => parseInt(a, 10))
+    .filter((a) => Number.isFinite(a) && a >= 1 && a <= 17)
+    .slice(0, childrenPerRoom);
+  const guestsPerRoom = adultsPerRoom + childAges.length;
 
   const header = (
     <section className="bg-navy pb-8 pt-28 text-white sm:pt-32">
@@ -43,7 +51,8 @@ export default async function HotelsPage({
         <h1 className="h-md text-white">Search hotels</h1>
         {city && (
           <p className="mt-2 text-white/80">
-            {city.label} · {rooms} room{rooms > 1 ? "s" : ""} · {adultsPerRoom} guest{adultsPerRoom > 1 ? "s" : ""} / room
+            {city.label} · {rooms} room{rooms > 1 ? "s" : ""} · {guestsPerRoom} guest{guestsPerRoom > 1 ? "s" : ""} / room
+            {childAges.length > 0 ? ` (${adultsPerRoom} adult${adultsPerRoom > 1 ? "s" : ""} + ${childAges.length} child${childAges.length > 1 ? "ren" : ""})` : ""}
           </p>
         )}
       </Container>
@@ -103,7 +112,10 @@ export default async function HotelsPage({
         checkOutISO: sp.checkOut,
         hotelCodes: codes,
         nationality: "IN",
-        rooms: Array.from({ length: rooms }, () => ({ adults: adultsPerRoom })),
+        rooms: Array.from({ length: rooms }, () => ({
+          adults: adultsPerRoom,
+          childrenAges: childAges.length ? childAges : undefined,
+        })),
       })
     : { ok: false as const, source: "unavailable" as const, checkInISO: sp.checkIn, checkOutISO: sp.checkOut, offers: [], error: "no-hotel-codes" };
 
@@ -154,6 +166,7 @@ export default async function HotelsPage({
                     checkOut={sp.checkOut!}
                     rooms={rooms}
                     adults={adultsPerRoom}
+                    childAges={childAges}
                     cityLabel={city.label}
                   />
                 ))}

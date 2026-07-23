@@ -29,6 +29,7 @@ export function HotelCard({
   checkOut,
   rooms,
   adults,
+  childAges,
   cityLabel,
 }: {
   offer: HotelOffer;
@@ -38,6 +39,8 @@ export function HotelCard({
   checkOut: string;
   rooms: number;
   adults: number;
+  /** Ages of children per room (uniform occupancy), empty = adults only. */
+  childAges?: number[];
   cityLabel: string;
 }) {
   const cheapest = offer.rooms[0];
@@ -58,6 +61,7 @@ export function HotelCard({
     nights: String(nights),
     rooms: String(rooms),
     adults: String(adults),
+    ...(childAges?.length ? { children: String(childAges.length), ages: childAges.join(",") } : {}),
     fare: String(offer.cheapestFare),
     currency: offer.currency || "INR",
     room: cheapest?.name ?? "Room",

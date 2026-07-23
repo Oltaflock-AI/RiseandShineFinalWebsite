@@ -445,11 +445,38 @@ function HotelsPanel() {
   const [checkOut, setCheckOut] = useState("");
   const [today, setToday] = useState("");
 
+  // Occupancy — uniform per room (TBO PaxRooms: adults 1–8, children 0–4 + ages).
+  const [rooms, setRooms] = useState(1);
+  const [adults, setAdults] = useState(2);
+  const [childCount, setChildCount] = useState(0);
+  const [childAges, setChildAges] = useState<number[]>([]);
+  const [paxOpen, setPaxOpen] = useState(false);
+  const paxRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setToday(iso(0));
     setCheckIn((d) => d || iso(14));
     setCheckOut((d) => d || iso(16));
   }, []);
+
+  // Close the guests popover on outside click (same pattern as flights).
+  useEffect(() => {
+    if (!paxOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (paxRef.current && !paxRef.current.contains(e.target as Node)) setPaxOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [paxOpen]);
+
+  const setChildren = (n: number) => {
+    const c = Math.max(0, Math.min(4, n));
+    setChildCount(c);
+    setChildAges((ages) => Array.from({ length: c }, (_, i) => ages[i] ?? 8));
+  };
+
+  const guestsPerRoom = adults + childCount;
+  const guestsTotal = guestsPerRoom * rooms;
 
   // Debounced destination autocomplete against the full TBO city dataset.
   useEffect(() => {
@@ -484,8 +511,12 @@ function HotelsPanel() {
     p.set("city", match ? match.cityCode : city.trim());
     if (checkIn) p.set("checkIn", checkIn);
     if (checkOut) p.set("checkOut", checkOut);
-    p.set("rooms", "1");
-    p.set("adults", "2");
+    p.set("rooms", String(rooms));
+    p.set("adults", String(adults));
+    if (childCount > 0) {
+      p.set("children", String(childCount));
+      p.set("ages", childAges.join(","));
+    }
     router.push(`/hotels?${p.toString()}`);
   };
 
@@ -526,12 +557,58 @@ function HotelsPanel() {
             <input type="date" value={checkOut} min={checkIn || today || undefined} onChange={(e) => setCheckOut(e.target.value)} aria-label="Check-out date" className={inputCls} />
           </div>
         </Field>
-        <Field label="Guests & rooms">
-          <div className="flex items-center gap-2">
-            <BedDouble size={17} className="flex-none text-red" aria-hidden />
-            <span className="text-[0.95rem] font-semibold text-ink">2 Guests · 1 Room</span>
-          </div>
-        </Field>
+        {/* Guests & rooms — popover mirroring the flights travellers control */}
+        <div className="relative border-b border-line lg:border-b-0 lg:border-l" ref={paxRef}>
+          <button
+            type="button"
+            onClick={() => setPaxOpen((o) => !o)}
+            className="flex w-full flex-col gap-1 px-5 py-3.5 text-left"
+            aria-expanded={paxOpen}
+          >
+            <span className="text-[0.68rem] font-bold uppercase tracking-[0.12em] text-muted">
+              Guests &amp; rooms
+            </span>
+            <span className="flex items-center gap-2">
+              <BedDouble size={17} className="flex-none text-red" aria-hidden />
+              <span className="flex-1 text-[0.95rem] font-semibold leading-tight text-ink">
+                {guestsTotal} Guest{guestsTotal > 1 ? "s" : ""} · {rooms} Room{rooms > 1 ? "s" : ""}
+              </span>
+              <ChevronDown size={15} className={cn("flex-none text-muted transition-transform", paxOpen && "rotate-180")} aria-hidden />
+            </span>
+          </button>
+
+          {paxOpen && (
+            <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 rounded-2xl border border-line bg-white p-4 shadow-brand lg:left-auto lg:right-0 lg:w-80">
+              <Stepper label="Rooms" sub="Same guests per room" value={rooms} onChange={(n) => setRooms(Math.max(1, Math.min(4, n)))} min={1} max={4} />
+              <Stepper label="Adults" sub="Per room · 12+ years" value={adults} onChange={(n) => setAdults(Math.max(1, Math.min(8, n)))} min={1} max={8} />
+              <Stepper label="Children" sub="Per room · under 12" value={childCount} onChange={setChildren} min={0} max={4} />
+              {childCount > 0 && (
+                <div className="mt-3 border-t border-line pt-3">
+                  <div className="mb-2 text-[0.72rem] font-bold uppercase tracking-wide text-muted">Children&apos;s ages</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {childAges.map((age, i) => (
+                      <select
+                        key={i}
+                        value={age}
+                        onChange={(e) =>
+                          setChildAges((ages) => ages.map((a, idx) => (idx === i ? Number(e.target.value) : a)))
+                        }
+                        aria-label={`Child ${i + 1} age`}
+                        className="rounded-lg border border-line bg-white px-2 py-2 text-[0.85rem] font-semibold text-ink"
+                      >
+                        {Array.from({ length: 17 }, (_, a) => a + 1).map((a) => (
+                          <option key={a} value={a}>
+                            {a} yr{a > 1 ? "s" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="grid place-items-center p-3.5">
           <Button type="submit" arrow fullWidth>
             Search Hotels
