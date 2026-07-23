@@ -306,7 +306,7 @@ export function SearchBar({
               </div>
 
               <form onSubmit={onSubmitFlights} aria-label="Search flights">
-                <div className="relative grid lg:grid-cols-[1.1fr_1.1fr_0.9fr_0.9fr_1.1fr_auto]">
+                <div className="relative grid lg:grid-cols-[1.35fr_1.35fr_0.75fr_0.75fr_1.1fr_auto]">
                   <span className="grad-red absolute bottom-3 left-0 top-3 hidden w-1 rounded-r-full lg:block" aria-hidden />
                   <Field label="From">
                     <label className="flex items-center gap-2">
