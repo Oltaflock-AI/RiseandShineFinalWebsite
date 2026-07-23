@@ -61,11 +61,9 @@ export async function submitEnquiry(
   const packageKey = val("package");
   const pkg = isCatalogPackage(packageKey) ? CATALOG_PACKAGES[packageKey] : null;
 
-  // Compose the "Additional Requirements" note from message + subject + package.
+  // Compose the "Additional Requirements" note from message + package.
   const noteParts: string[] = [];
-  const subject = val("subject");
   const message = val("message");
-  if (subject) noteParts.push(`Subject: ${subject}`);
   if (message) noteParts.push(message);
   if (pkg) {
     noteParts.push(

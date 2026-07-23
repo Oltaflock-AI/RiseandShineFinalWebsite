@@ -17,9 +17,10 @@ export function ContactForm() {
       action={action}
       className="rounded-brand-lg border border-line bg-white p-7 shadow-brand sm:p-10"
     >
-      <h2 className="h-md mb-1.5">Send us a message</h2>
+      <h2 className="h-md mb-1.5">Request an instant callback</h2>
       <p className="mb-6 text-muted">
-        Fill in the form and we&apos;ll get back to you shortly.
+        Share your details and a travel expert will call you right away to help
+        with your enquiry.
       </p>
 
       <div className="grid gap-5 sm:grid-cols-2">
@@ -61,31 +62,19 @@ export function ContactForm() {
       </div>
 
       <div className="mt-5">
-        <Field label="Subject" htmlFor="c-subject">
-          <input
-            id="c-subject"
-            name="subject"
-            type="text"
-            placeholder="How can we help?"
-            className={controlClass}
-          />
-        </Field>
-      </div>
-
-      <div className="mt-5">
-        <Field label="Message" htmlFor="c-message">
+        <Field label="Message (optional)" htmlFor="c-message">
           <textarea
             id="c-message"
             name="message"
             rows={5}
-            placeholder="Tell us a little about your travel plans…"
+            placeholder="Anything you'd like us to know before we call…"
             className={cn(controlClass, "min-h-32 resize-y")}
           />
         </Field>
       </div>
 
       <Button type="submit" fullWidth arrow disabled={pending} className="mt-6">
-        {pending ? "Sending…" : "Send Message"}
+        {pending ? "Sending…" : "Request Callback"}
       </Button>
       <FormNote state={state} />
     </form>
