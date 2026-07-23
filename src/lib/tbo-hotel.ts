@@ -107,6 +107,8 @@ export type HotelSearchArgs = {
   rooms: RoomOccupancy[];
   refundableOnly?: boolean;
   mealType?: "All" | "WithMeal" | "RoomOnly";
+  /** Return EVERY room option per hotel (detail page), not just the cheapest. */
+  allRoomOptions?: boolean;
 };
 
 export type CancelPolicy = {
@@ -207,6 +209,7 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
     args.rooms,
     args.refundableOnly,
     args.mealType,
+    args.allRoomOptions,
   ]);
   const hit = searchCache.get(key);
   if (hit && hit.exp > Date.now()) return hit.data;
@@ -220,7 +223,11 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
     };
   });
 
-  const filters: Record<string, unknown> = { NoOfRooms: args.rooms.length };
+  // Filters.NoOfRooms caps how many ROOM OPTIONS TBO returns per hotel
+  // (verified live: with it = 1 room/hotel, without = full list, e.g. 13).
+  // Results pages want the cap (cheapest only); the detail page wants them all.
+  const filters: Record<string, unknown> = {};
+  if (!args.allRoomOptions) filters.NoOfRooms = args.rooms.length;
   if (args.refundableOnly) filters.Refundable = true;
   if (args.mealType) filters.MealType = args.mealType;
 
