@@ -6,7 +6,7 @@ import { HotelResultsFallback } from "@/components/ui/SearchFallbacks";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/sections/SearchBar";
-import { HotelCard } from "@/components/ui/HotelCard";
+import { HotelResultsClient, type HotelItem } from "@/components/ui/HotelResultsClient";
 import { searchHotels } from "@/lib/tbo-hotel";
 import { hotelCodesByCity, hotelInfoBatch } from "@/lib/tbo-hotel-static";
 import { POPULAR_CITIES } from "@/data/hotel-cities";
@@ -52,7 +52,6 @@ export default async function HotelsPage({
   const minStars = [3, 4, 5].includes(Number(sp.stars)) ? Number(sp.stars) : 0;
   const refundableOnly = sp.refundable === "1";
   const meal = sp.meal === "WithMeal" || sp.meal === "RoomOnly" ? sp.meal : undefined;
-  const sort = sp.sort === "price-desc" || sp.sort === "stars" ? sp.sort : "price";
 
   /** Current search URL with some params changed (empty string removes one). */
   const qs = (overrides: Record<string, string>) => {
@@ -124,9 +123,10 @@ export default async function HotelsPage({
     }`;
 
   // Re-suspend (show the searching fallback) whenever the search itself changes.
+  // Sorting is client-side (HotelResultsClient) and never re-triggers this.
   const searchKey = [
     city.cityCode, sp.checkIn, sp.checkOut, rooms, adultsPerRoom,
-    childAges.join(","), minStars, refundableOnly ? 1 : 0, meal ?? "", sort,
+    childAges.join(","), minStars, refundableOnly ? 1 : 0, meal ?? "",
   ].join("|");
 
   return (
@@ -156,18 +156,6 @@ export default async function HotelsPage({
                 Room only
               </Link>
             </div>
-            <div className="ml-auto flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Sort</span>
-              <Link href={qs({ sort: "" })} className={chip(sort === "price")}>
-                Price ↑
-              </Link>
-              <Link href={qs({ sort: "price-desc" })} className={chip(sort === "price-desc")}>
-                Price ↓
-              </Link>
-              <Link href={qs({ sort: "stars" })} className={chip(sort === "stars")}>
-                Stars
-              </Link>
-            </div>
           </div>
 
           <Suspense key={searchKey} fallback={<HotelResultsFallback cityLabel={city.label} />}>
@@ -181,7 +169,6 @@ export default async function HotelsPage({
               minStars={minStars}
               refundableOnly={refundableOnly}
               meal={meal}
-              sort={sort}
               clearFiltersHref={qs({ stars: "", refundable: "", meal: "" })}
             />
           </Suspense>
@@ -206,7 +193,6 @@ async function HotelResults({
   minStars,
   refundableOnly,
   meal,
-  sort,
   clearFiltersHref,
 }: {
   sp: Record<string, string | undefined>;
@@ -218,7 +204,6 @@ async function HotelResults({
   minStars: number;
   refundableOnly: boolean;
   meal?: "WithMeal" | "RoomOnly";
-  sort: string;
   clearFiltersHref: string;
 }) {
   // Resolve this city's hotels (static data), price the first 100 (TBO's ceiling),
@@ -253,15 +238,14 @@ async function HotelResults({
     ? await hotelInfoBatch(res.offers.map((o) => o.hotelCode))
     : new Map<string, never>();
 
-  // Stars filter + sort are applied here, after TBO's own meal/refundable pass.
+  // Stars filter is applied here, after TBO's own meal/refundable pass.
+  // Sorting is client-side in HotelResultsClient.
   const starsOf = (code: string) =>
     infoMap.get(code)?.rating ||
     ({ onestar: 1, twostar: 2, threestar: 3, fourstar: 4, fivestar: 5 }[
       (stubByCode.get(code)?.rating ?? "").toLowerCase().replace(/[^a-z]/g, "")
     ] ?? 0);
-  let offers = res.ok ? res.offers.filter((o) => !minStars || starsOf(o.hotelCode) >= minStars) : [];
-  if (sort === "price-desc") offers = [...offers].sort((a, b) => b.cheapestFare - a.cheapestFare);
-  else if (sort === "stars") offers = [...offers].sort((a, b) => starsOf(b.hotelCode) - starsOf(a.hotelCode) || a.cheapestFare - b.cheapestFare);
+  const offers = res.ok ? res.offers.filter((o) => !minStars || starsOf(o.hotelCode) >= minStars) : [];
 
   const occupancyQS = [
     `checkIn=${sp.checkIn}`,
@@ -329,24 +313,23 @@ async function HotelResults({
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {offers.map((o) => (
-                    <HotelCard
-                      key={o.hotelCode}
-                      offer={o}
-                      stub={{ ...stubByCode.get(o.hotelCode), rating: String(starsOf(o.hotelCode) || "") }}
-                      nights={nights}
-                      checkIn={sp.checkIn!}
-                      checkOut={sp.checkOut!}
-                      rooms={rooms}
-                      adults={adultsPerRoom}
-                      childAges={childAges}
-                      cityLabel={city.label}
-                      image={infoMap.get(o.hotelCode)?.images?.[0]}
-                      detailHref={`/hotels/${o.hotelCode}?${occupancyQS}`}
-                    />
-                  ))}
-                </div>
+                <HotelResultsClient
+                  items={offers.map((o): HotelItem => ({
+                    offer: o,
+                    stub: { ...stubByCode.get(o.hotelCode), rating: String(starsOf(o.hotelCode) || "") },
+                    stars: starsOf(o.hotelCode),
+                    image: infoMap.get(o.hotelCode)?.images?.[0],
+                    detailHref: `/hotels/${o.hotelCode}?${occupancyQS}`,
+                  }))}
+                  nights={nights}
+                  checkIn={sp.checkIn!}
+                  checkOut={sp.checkOut!}
+                  rooms={rooms}
+                  adults={adultsPerRoom}
+                  childAges={childAges}
+                  cityLabel={city.label}
+                  initialSort={sp.sort}
+                />
               )}
 
               <p className="mt-8 text-center text-[0.82rem] text-muted">

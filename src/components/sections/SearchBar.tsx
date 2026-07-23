@@ -12,6 +12,7 @@ import {
 import {
   ArrowRightLeft,
   BedDouble,
+  Building2,
   CalendarDays,
   ChevronDown,
   Loader2,
@@ -86,6 +87,15 @@ function Field({
 
 const inputCls =
   "w-full bg-transparent text-base font-semibold text-ink outline-none placeholder:font-normal placeholder:text-muted/70";
+
+/** "IN" → "India" (falls back to the raw code on unknown regions). */
+const regionName = (cc: string) => {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(cc) || cc;
+  } catch {
+    return cc;
+  }
+};
 
 const iso = (offsetDays: number) => {
   const d = new Date();
@@ -502,11 +512,31 @@ export function SearchBar({
   );
 }
 
+/** One destination row in the hotels typeahead panel. */
+function CityOption({ city, onPick }: { city: HotelCity; onPick: (c: HotelCity) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(city)}
+      className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-line/30"
+    >
+      <Building2 size={18} className="flex-none text-muted" aria-hidden />
+      <span className="min-w-0">
+        <span className="block truncate text-[0.92rem] font-semibold text-ink">{city.label}</span>
+        <span className="block truncate text-[0.78rem] text-muted">
+          {regionName(city.countryCode)}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function HotelsPanel() {
   const router = useRouter();
-  const cityListId = useId();
   const [city, setCity] = useState("");
-  const [suggestions, setSuggestions] = useState<HotelCity[]>(POPULAR_CITIES);
+  const [cityOpen, setCityOpen] = useState(false);
+  const cityRef = useRef<HTMLDivElement>(null);
+  const [suggestions, setSuggestions] = useState<HotelCity[]>([]);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [today, setToday] = useState("");
@@ -535,6 +565,16 @@ function HotelsPanel() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [paxOpen]);
 
+  // Close the destination panel on outside click.
+  useEffect(() => {
+    if (!cityOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (cityRef.current && !cityRef.current.contains(e.target as Node)) setCityOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [cityOpen]);
+
   const setChildren = (n: number) => {
     const c = Math.max(0, Math.min(4, n));
     setChildCount(c);
@@ -555,7 +595,7 @@ function HotelsPanel() {
     const t = setTimeout(() => {
       fetch(`/api/hotels/cities?q=${encodeURIComponent(q)}`, { signal: ctl.signal })
         .then((r) => r.json())
-        .then((j) => j?.cities?.length && setSuggestions(j.cities))
+        .then((j) => setSuggestions(j?.cities ?? []))
         .catch(() => {});
     }, 200);
     return () => {
@@ -566,6 +606,11 @@ function HotelsPanel() {
 
   // Acknowledge the click for the whole navigation (same pattern as flights).
   const [searching, startSearch] = useTransition();
+
+  const pickCity = (c: HotelCity) => {
+    setCity(c.label);
+    setCityOpen(false);
+  };
 
   const search = (e: React.FormEvent) => {
     e.preventDefault();
@@ -598,22 +643,58 @@ function HotelsPanel() {
       <div className="relative grid lg:grid-cols-[1.6fr_1fr_1fr_1.1fr_auto]">
         <span className="grad-red absolute inset-y-0 left-0 hidden w-[6px] lg:block" aria-hidden />
         <Field label="Destination">
-          <label className="flex items-center gap-2">
-            <MapPin size={17} className="flex-none text-red" aria-hidden />
-            <input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="City (e.g. Delhi, Mumbai, Dubai)"
-              aria-label="Hotel destination"
-              list={cityListId}
-              className={inputCls}
-            />
-          </label>
-          <datalist id={cityListId}>
-            {suggestions.map((c) => (
-              <option key={c.cityCode} value={c.label} />
-            ))}
-          </datalist>
+          <div className="relative" ref={cityRef}>
+            <label className="flex items-center gap-2">
+              <MapPin size={17} className="flex-none text-red" aria-hidden />
+              <input
+                value={city}
+                onChange={(e) => {
+                  setCity(e.target.value);
+                  setCityOpen(true);
+                }}
+                onFocus={() => setCityOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setCityOpen(false);
+                }}
+                placeholder="Where do you want to stay?"
+                aria-label="Hotel destination"
+                aria-expanded={cityOpen}
+                autoComplete="off"
+                className={inputCls}
+              />
+            </label>
+
+            {cityOpen && (
+              <div className="absolute -left-5 -right-5 top-[calc(100%+16px)] z-30 rounded-2xl border border-line bg-white p-4 shadow-brand lg:right-auto lg:w-[560px] lg:p-5">
+                {city.trim().length < 2 ? (
+                  <>
+                    <div className="mb-3 text-[0.95rem] font-bold text-ink">
+                      Popular destinations
+                    </div>
+                    <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                      {POPULAR_CITIES.slice(0, 10).map((c) => (
+                        <CityOption key={c.cityCode} city={c} onPick={pickCity} />
+                      ))}
+                    </div>
+                    <p className="mt-3 border-t border-line pt-3 text-[0.78rem] text-muted">
+                      Or start typing — we cover 43,000+ cities worldwide.
+                    </p>
+                  </>
+                ) : suggestions.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-1">
+                    {suggestions.slice(0, 8).map((c) => (
+                      <CityOption key={c.cityCode} city={c} onPick={pickCity} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-2 py-1 text-[0.85rem] text-muted">
+                    No matching destination yet — keep typing, or press Search and
+                    we&apos;ll match it for you.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </Field>
         <Field label="Check-in">
           <div className="flex items-center gap-2">
