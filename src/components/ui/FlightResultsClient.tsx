@@ -5,6 +5,7 @@ import {
   Briefcase,
   ChevronDown,
   Luggage,
+  Plane,
   RotateCcw,
   SlidersHorizontal,
 } from "lucide-react";
@@ -353,6 +354,7 @@ export function FlightResultsClient({
   const [bagCabin, setBagCabin] = useState(false);
   const [bagChecked, setBagChecked] = useState(false);
 
+  const nonstopOnly = stops.size === 1 && stops.has(0);
   const filtersActive =
     stops.size < 3 ||
     airlines.size < domain.airlines.length ||
@@ -448,7 +450,7 @@ export function FlightResultsClient({
       className={cn(
         "rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm",
         filtersOpen ? "block" : "hidden",
-        "lg:sticky lg:top-24 lg:block lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto",
+        "lg:block",
       )}
     >
       <div className="flex items-center justify-between pb-1">
@@ -463,6 +465,27 @@ export function FlightResultsClient({
           </button>
         )}
       </div>
+
+      {domain.stopMin[0] != null && (
+        <button
+          type="button"
+          onClick={() => setStops(nonstopOnly ? new Set([0, 1, 2]) : new Set([0]))}
+          aria-pressed={nonstopOnly}
+          className={cn(
+            "mb-1 mt-2 flex w-full items-center justify-between rounded-full border px-4 py-2.5 text-[0.85rem] font-semibold transition-colors",
+            nonstopOnly
+              ? "border-red bg-red/10 text-red"
+              : "border-line text-ink hover:border-red/50",
+          )}
+        >
+          <span className="flex items-center gap-2">
+            <Plane className="h-4 w-4" aria-hidden /> Non-stop only
+          </span>
+          <span className={cn("text-[0.78rem] font-medium", nonstopOnly ? "text-red" : "text-muted")}>
+            from ₹{inr.format(domain.stopMin[0])}
+          </span>
+        </button>
+      )}
 
       <Section title="Stops">
         {stopOptions
