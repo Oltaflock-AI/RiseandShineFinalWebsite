@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { Search, TriangleAlert } from "lucide-react";
+import { FlightResultsFallback } from "@/components/ui/SearchFallbacks";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/sections/SearchBar";
@@ -126,6 +128,83 @@ export default async function FlightsPage({
       })();
   }
 
+  // Re-suspend (show the searching fallback) whenever the search itself changes.
+  const searchKey = [
+    from, to, departISO, returnISO ?? "", adults, childCount, infantCount,
+    cabin, directOnly ? 1 : 0, sp.airline ?? "", sp.sort ?? "",
+  ].join("|");
+
+  return (
+    <>
+      {header}
+      <section className="py-12 sm:py-16">
+        <Container>
+          <Suspense key={searchKey} fallback={<FlightResultsFallback />}>
+            <FlightResults
+              sp={sp}
+              from={from}
+              to={to}
+              departISO={departISO}
+              returnISO={returnISO}
+              adults={adults}
+              childCount={childCount}
+              infantCount={infantCount}
+              cabin={cabin}
+              directOnly={directOnly}
+              preferredAirlines={preferredAirlines}
+              trip={trip}
+              fromCity={fromA?.city}
+              fromCountry={fromA?.country}
+              toCity={toA.city}
+              toCountry={toA.country}
+            />
+          </Suspense>
+        </Container>
+      </section>
+    </>
+  );
+}
+
+/**
+ * The slow half of the page: the live TBO search + results. Rendering it behind
+ * a keyed Suspense boundary lets the header + search bar paint instantly while
+ * this streams in — the user sees the branded searching state, not a dead page.
+ */
+async function FlightResults({
+  sp,
+  from,
+  to,
+  departISO,
+  returnISO,
+  adults,
+  childCount,
+  infantCount,
+  cabin,
+  directOnly,
+  preferredAirlines,
+  trip,
+  fromCity,
+  fromCountry,
+  toCity,
+  toCountry,
+}: {
+  sp: Record<string, string | undefined>;
+  from: string;
+  to: string;
+  departISO: string;
+  returnISO?: string;
+  adults: number;
+  childCount: number;
+  infantCount: number;
+  cabin: string;
+  directOnly: boolean;
+  preferredAirlines?: string[];
+  trip: "oneway" | "round";
+  fromCity?: string;
+  fromCountry?: string;
+  toCity: string;
+  toCountry?: string;
+}) {
   const res = await searchFlights({
     from,
     to,
@@ -173,7 +252,7 @@ export default async function FlightsPage({
           adults,
           children: childCount,
           infants: infantCount,
-          isInternational: fromA?.country !== "IN" || toA.country !== "IN",
+          isInternational: fromCountry !== "IN" || toCountry !== "IN",
         }
       : undefined;
   const noResults = !res.ok && /no result|not found|no flight|no fare/i.test(res.error || "");
@@ -181,10 +260,7 @@ export default async function FlightsPage({
 
   return (
     <>
-      {header}
-      <section className="py-12 sm:py-16">
-        <Container>
-          {!res.ok ? (
+      {!res.ok ? (
             <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
               <TriangleAlert className="mx-auto mb-4 text-red" aria-hidden />
               <h2 className="h-sm mb-2">
@@ -194,7 +270,7 @@ export default async function FlightsPage({
                 {noResults ? (
                   <>
                     We couldn&apos;t find {cabin} {directOnly ? "non-stop " : ""}flights for{" "}
-                    {fromA?.city} → {toA.city} on these dates.
+                    {fromCity} → {toCity} on these dates.
                     {hasFilters
                       ? " Try a different cabin, remove the non-stop filter, or change your dates —"
                       : " Try different dates —"}{" "}
@@ -202,13 +278,13 @@ export default async function FlightsPage({
                   </>
                 ) : (
                   <>
-                    We couldn&apos;t reach the flight system for {fromA?.city} → {toA.city} just now.
+                    We couldn&apos;t reach the flight system for {fromCity} → {toCity} just now.
                     Send us the trip and our team will get you the best fare by hand.
                   </>
                 )}
               </p>
               <div className="flex flex-wrap justify-center gap-3">
-                <Button href={`/plan-my-trip?destination=${encodeURIComponent(toA.city)}&journey=${to.length === 3 && fromA?.country === "IN" && toA.country === "IN" ? "Domestic" : "International"}`} arrow>
+                <Button href={`/plan-my-trip?destination=${encodeURIComponent(toCity)}&journey=${to.length === 3 && fromCountry === "IN" && toCountry === "IN" ? "Domestic" : "International"}`} arrow>
                   Enquire for This Route
                 </Button>
                 <Button href={site.phone.whatsappHref} variant="light">
@@ -228,7 +304,7 @@ export default async function FlightsPage({
               <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-[1.15rem] font-bold text-ink">
                   {outbound.length} flight{outbound.length > 1 ? "s" : ""}{" "}
-                  {trip === "round" ? "(outbound)" : ""} · {fromA?.city} → {toA.city}
+                  {trip === "round" ? "(outbound)" : ""} · {fromCity} → {toCity}
                 </h2>
                 {res.cheapestINR != null && (
                   <span className="text-[0.9rem] text-muted">
@@ -250,7 +326,7 @@ export default async function FlightsPage({
               {trip === "round" && inbound && inbound.length > 0 && (
                 <>
                   <h2 className="mb-6 mt-12 text-[1.15rem] font-bold text-ink">
-                    Return · {toA.city} → {fromA?.city}
+                    Return · {toCity} → {fromCity}
                   </h2>
                   <div className="space-y-4">
                     {inbound.map((o) => (
@@ -279,8 +355,6 @@ export default async function FlightsPage({
               </p>
             </>
           )}
-        </Container>
-      </section>
     </>
   );
 }

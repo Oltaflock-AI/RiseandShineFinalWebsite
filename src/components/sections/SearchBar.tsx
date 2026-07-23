@@ -6,6 +6,7 @@ import {
   useId,
   useRef,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 import {
@@ -13,6 +14,7 @@ import {
   BedDouble,
   CalendarDays,
   ChevronDown,
+  Loader2,
   MapPin,
   Minus,
   Plane,
@@ -238,9 +240,13 @@ export function SearchBar({
 
   const paxTotal = adults + children + infants;
 
+  // Tracks the search navigation so the button can acknowledge the click —
+  // isPending stays true until the results route (or its fallback) renders.
+  const [searching, startSearch] = useTransition();
+
   const onSubmitFlights = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!to.trim()) return;
+    if (!to.trim() || searching) return;
     const p = new URLSearchParams({
       from: from.trim() || "Ahmedabad (AMD)",
       to: to.trim(),
@@ -255,7 +261,7 @@ export function SearchBar({
     if (trip === "round" && ret) p.set("return", ret);
     if (airline) p.set("airline", airline);
     if (nonStop) p.set("nonstop", "1");
-    router.push(`/flights?${p.toString()}`);
+    startSearch(() => router.push(`/flights?${p.toString()}`));
   };
 
   const noteColor = overlap ? "text-muted" : "text-white/85";
@@ -413,8 +419,14 @@ export function SearchBar({
                   </div>
 
                   <div className="grid place-items-center p-3.5">
-                    <Button type="submit" arrow fullWidth>
-                      Search Flights
+                    <Button type="submit" arrow={!searching} fullWidth disabled={searching}>
+                      {searching ? (
+                        <>
+                          <Loader2 size={17} className="animate-spin" aria-hidden /> Searching…
+                        </>
+                      ) : (
+                        "Search Flights"
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -552,8 +564,12 @@ function HotelsPanel() {
     };
   }, [city]);
 
+  // Acknowledge the click for the whole navigation (same pattern as flights).
+  const [searching, startSearch] = useTransition();
+
   const search = (e: React.FormEvent) => {
     e.preventDefault();
+    if (searching) return;
     // Selecting a datalist option leaves its label in the input — map it back to
     // its TBO CityCode. Unmatched free text is resolved server-side.
     const q = city.trim().toLowerCase();
@@ -571,7 +587,7 @@ function HotelsPanel() {
       p.set("children", String(childCount));
       p.set("ages", childAges.join(","));
     }
-    router.push(`/hotels?${p.toString()}`);
+    startSearch(() => router.push(`/hotels?${p.toString()}`));
   };
 
   return (
@@ -664,8 +680,14 @@ function HotelsPanel() {
           )}
         </div>
         <div className="grid place-items-center p-3.5">
-          <Button type="submit" arrow fullWidth>
-            Search Hotels
+          <Button type="submit" arrow={!searching} fullWidth disabled={searching}>
+            {searching ? (
+              <>
+                <Loader2 size={17} className="animate-spin" aria-hidden /> Searching…
+              </>
+            ) : (
+              "Search Hotels"
+            )}
           </Button>
         </div>
       </div>

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { BedDouble, TriangleAlert } from "lucide-react";
+import { HotelResultsFallback } from "@/components/ui/SearchFallbacks";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { SearchBar } from "@/components/sections/SearchBar";
@@ -116,6 +118,109 @@ export default async function HotelsPage({
 
   const nights = nightsBetween(sp.checkIn, sp.checkOut);
 
+  const chip = (active: boolean) =>
+    `rounded-full border px-3.5 py-2.5 text-[0.82rem] font-semibold transition-colors ${
+      active ? "border-red bg-red/10 text-red" : "border-line text-ink hover:border-red/50"
+    }`;
+
+  // Re-suspend (show the searching fallback) whenever the search itself changes.
+  const searchKey = [
+    city.cityCode, sp.checkIn, sp.checkOut, rooms, adultsPerRoom,
+    childAges.join(","), minStars, refundableOnly ? 1 : 0, meal ?? "", sort,
+  ].join("|");
+
+  return (
+    <>
+      {header}
+      <section className="py-12 sm:py-16">
+        <Container>
+          {/* Filter / sort rail — outside the Suspense boundary so it paints
+              instantly and stays clickable while a (re)search streams in. */}
+          <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Stars</span>
+              {[0, 3, 4, 5].map((s) => (
+                <Link key={s} href={qs({ stars: s ? String(s) : "" })} className={chip(minStars === s)}>
+                  {s === 0 ? "Any" : `${s}★+`}
+                </Link>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Link href={qs({ refundable: refundableOnly ? "" : "1" })} className={chip(refundableOnly)}>
+                Free cancellation
+              </Link>
+              <Link href={qs({ meal: meal === "WithMeal" ? "" : "WithMeal" })} className={chip(meal === "WithMeal")}>
+                With breakfast
+              </Link>
+              <Link href={qs({ meal: meal === "RoomOnly" ? "" : "RoomOnly" })} className={chip(meal === "RoomOnly")}>
+                Room only
+              </Link>
+            </div>
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Sort</span>
+              <Link href={qs({ sort: "" })} className={chip(sort === "price")}>
+                Price ↑
+              </Link>
+              <Link href={qs({ sort: "price-desc" })} className={chip(sort === "price-desc")}>
+                Price ↓
+              </Link>
+              <Link href={qs({ sort: "stars" })} className={chip(sort === "stars")}>
+                Stars
+              </Link>
+            </div>
+          </div>
+
+          <Suspense key={searchKey} fallback={<HotelResultsFallback cityLabel={city.label} />}>
+            <HotelResults
+              sp={sp}
+              city={city}
+              rooms={rooms}
+              adultsPerRoom={adultsPerRoom}
+              childAges={childAges}
+              nights={nights}
+              minStars={minStars}
+              refundableOnly={refundableOnly}
+              meal={meal}
+              sort={sort}
+              clearFiltersHref={qs({ stars: "", refundable: "", meal: "" })}
+            />
+          </Suspense>
+        </Container>
+      </section>
+    </>
+  );
+}
+
+/**
+ * The slow half of the page: static hotel-code resolve + live TBO search +
+ * photo/rating join. Streams behind the keyed Suspense boundary above so the
+ * header, search bar, and filter rail respond instantly.
+ */
+async function HotelResults({
+  sp,
+  city,
+  rooms,
+  adultsPerRoom,
+  childAges,
+  nights,
+  minStars,
+  refundableOnly,
+  meal,
+  sort,
+  clearFiltersHref,
+}: {
+  sp: Record<string, string | undefined>;
+  city: { label: string; cityCode: string };
+  rooms: number;
+  adultsPerRoom: number;
+  childAges: number[];
+  nights: number;
+  minStars: number;
+  refundableOnly: boolean;
+  meal?: "WithMeal" | "RoomOnly";
+  sort: string;
+  clearFiltersHref: string;
+}) {
   // Resolve this city's hotels (static data), price the first 100 (TBO's ceiling),
   // then join the priced offers back to their names/ratings for display.
   let stubs: Awaited<ReturnType<typeof hotelCodesByCity>> = [];
@@ -129,8 +234,8 @@ export default async function HotelsPage({
 
   const res = codes.length
     ? await searchHotels({
-        checkInISO: sp.checkIn,
-        checkOutISO: sp.checkOut,
+        checkInISO: sp.checkIn!,
+        checkOutISO: sp.checkOut!,
         hotelCodes: codes,
         nationality: "IN",
         rooms: Array.from({ length: rooms }, () => ({
@@ -140,7 +245,7 @@ export default async function HotelsPage({
         refundableOnly,
         mealType: meal,
       })
-    : { ok: false as const, source: "unavailable" as const, checkInISO: sp.checkIn, checkOutISO: sp.checkOut, offers: [], error: "no-hotel-codes" };
+    : { ok: false as const, source: "unavailable" as const, checkInISO: sp.checkIn!, checkOutISO: sp.checkOut!, offers: [], error: "no-hotel-codes" };
 
   // Photos + authoritative star ratings for the returned hotels — one batched,
   // cached static call. Cosmetic: failure just means no images on cards.
@@ -167,70 +272,29 @@ export default async function HotelsPage({
     `city=${encodeURIComponent(city.cityCode)}`,
   ].join("&");
 
-  const chip = (active: boolean) =>
-    `rounded-full border px-3.5 py-2.5 text-[0.82rem] font-semibold transition-colors ${
-      active ? "border-red bg-red/10 text-red" : "border-line text-ink hover:border-red/50"
-    }`;
+  if (!res.ok) {
+    return (
+      <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
+        <TriangleAlert className="mx-auto mb-4 text-red" aria-hidden />
+        <h2 className="h-sm mb-2">Live rates are unavailable right now</h2>
+        <p className="mb-6 text-muted">
+          We couldn&apos;t reach the hotel system for {city.label} just now. Send us your
+          stay and our team will get you the best rate.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Button href={`/plan-my-trip?service=Hotel&destination=${encodeURIComponent(city.label)}`} arrow>
+            Enquire for This Stay
+          </Button>
+          <Button href={site.phone.whatsappHref} variant="light">
+            WhatsApp Us
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
-      {header}
-      <section className="py-12 sm:py-16">
-        <Container>
-          {!res.ok ? (
-            <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
-              <TriangleAlert className="mx-auto mb-4 text-red" aria-hidden />
-              <h2 className="h-sm mb-2">Live rates are unavailable right now</h2>
-              <p className="mb-6 text-muted">
-                We couldn&apos;t reach the hotel system for {city.label} just now. Send us your
-                stay and our team will get you the best rate.
-              </p>
-              <div className="flex flex-wrap justify-center gap-3">
-                <Button href={`/plan-my-trip?service=Hotel&destination=${encodeURIComponent(city.label)}`} arrow>
-                  Enquire for This Stay
-                </Button>
-                <Button href={site.phone.whatsappHref} variant="light">
-                  WhatsApp Us
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* filter / sort rail */}
-              <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Stars</span>
-                  {[0, 3, 4, 5].map((s) => (
-                    <Link key={s} href={qs({ stars: s ? String(s) : "" })} className={chip(minStars === s)}>
-                      {s === 0 ? "Any" : `${s}★+`}
-                    </Link>
-                  ))}
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Link href={qs({ refundable: refundableOnly ? "" : "1" })} className={chip(refundableOnly)}>
-                    Free cancellation
-                  </Link>
-                  <Link href={qs({ meal: meal === "WithMeal" ? "" : "WithMeal" })} className={chip(meal === "WithMeal")}>
-                    With breakfast
-                  </Link>
-                  <Link href={qs({ meal: meal === "RoomOnly" ? "" : "RoomOnly" })} className={chip(meal === "RoomOnly")}>
-                    Room only
-                  </Link>
-                </div>
-                <div className="ml-auto flex flex-wrap items-center gap-1.5">
-                  <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Sort</span>
-                  <Link href={qs({ sort: "" })} className={chip(sort === "price")}>
-                    Price ↑
-                  </Link>
-                  <Link href={qs({ sort: "price-desc" })} className={chip(sort === "price-desc")}>
-                    Price ↓
-                  </Link>
-                  <Link href={qs({ sort: "stars" })} className={chip(sort === "stars")}>
-                    Stars
-                  </Link>
-                </div>
-              </div>
-
               <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-[1.15rem] font-bold text-ink">
                   {offers.length} hotel{offers.length !== 1 ? "s" : ""} · {city.label}
@@ -251,7 +315,7 @@ export default async function HotelsPage({
                   </p>
                   <div className="flex flex-wrap justify-center gap-3">
                     {(minStars || refundableOnly || meal) ? (
-                      <Button href={qs({ stars: "", refundable: "", meal: "" })} arrow>
+                      <Button href={clearFiltersHref} arrow>
                         Clear filters
                       </Button>
                     ) : (
@@ -289,10 +353,6 @@ export default async function HotelsPage({
                 Live rates via our booking system · prices are confirmed at the time of
                 booking. Tap a hotel to see all room options.
               </p>
-            </>
-          )}
-        </Container>
-      </section>
     </>
   );
 }

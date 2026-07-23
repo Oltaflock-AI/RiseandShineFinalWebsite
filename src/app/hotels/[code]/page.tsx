@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { RoomOptionsFallback } from "@/components/ui/SearchFallbacks";
 import {
   Star,
   MapPin,
@@ -88,36 +90,11 @@ export default async function HotelDetailPage({
     : "/hotels";
   const cityLabel = (sp.city && cityByCode(sp.city)?.label) || "";
 
-  // Static content is independent of dates; rooms need a stay window.
+  // Static content is independent of dates; rooms need a stay window. Only the
+  // static info is awaited here — the room search streams in behind Suspense.
   const hasStay = Boolean(sp.checkIn && sp.checkOut && sp.checkOut > sp.checkIn!);
-  const searchArgs = {
-    checkInISO: sp.checkIn!,
-    checkOutISO: sp.checkOut!,
-    hotelCodes: [code],
-    nationality: "IN",
-    rooms: Array.from({ length: rooms }, () => ({
-      adults: adultsPerRoom,
-      childrenAges: childAges.length ? childAges : undefined,
-    })),
-  };
-  let [info, res] = await Promise.all([
-    hotelInfo(code),
-    hasStay ? searchHotels({ ...searchArgs, allRoomOptions: true }) : Promise.resolve(null),
-  ]);
-  // TBO's staging occasionally returns an empty result transiently. Fall back to
-  // the capped search (what the results page priced) so the page stays bookable.
-  if (hasStay && (!res?.ok || !res.offers.length)) {
-    res = await searchHotels(searchArgs);
-  }
-
-  const offer = res?.ok ? res.offers.find((o) => o.hotelCode === code) ?? res.offers[0] : undefined;
-  const roomOptions = offer?.rooms ?? [];
+  const info = await hotelInfo(code);
   const nights = hasStay ? nightsBetween(sp.checkIn!, sp.checkOut!) : 1;
-  const money = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: offer?.currency || "INR",
-    maximumFractionDigits: 0,
-  });
   const name = info?.name || `Hotel ${code}`;
   const gallery = info?.images?.slice(0, 5) ?? [];
   const facilities = curateFacilities(info?.facilities ?? []);
@@ -189,17 +166,143 @@ export default async function HotelDetailPage({
           <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
             {/* ── rooms ── */}
             <div>
-              <h2 className="mb-4 text-[1.2rem] font-bold text-ink">
-                {hasStay ? `Room options (${roomOptions.length})` : "Room options"}
-              </h2>
-
               {!hasStay ? (
-                <div className="rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
-                  <BedDouble className="mx-auto mb-3 text-red" aria-hidden />
-                  <p className="mb-4 text-muted">Pick your dates to see live room rates.</p>
-                  <Button href={backToResults} arrow>Choose dates</Button>
+                <>
+                  <h2 className="mb-4 text-[1.2rem] font-bold text-ink">Room options</h2>
+                  <div className="rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
+                    <BedDouble className="mx-auto mb-3 text-red" aria-hidden />
+                    <p className="mb-4 text-muted">Pick your dates to see live room rates.</p>
+                    <Button href={backToResults} arrow>Choose dates</Button>
+                  </div>
+                </>
+              ) : (
+                <Suspense
+                  key={[code, sp.checkIn, sp.checkOut, rooms, adultsPerRoom, childAges.join(",")].join("|")}
+                  fallback={
+                    <>
+                      <h2 className="mb-4 text-[1.2rem] font-bold text-ink">Room options</h2>
+                      <RoomOptionsFallback />
+                    </>
+                  }
+                >
+                  <RoomOptions
+                    code={code}
+                    name={name}
+                    cityLabel={cityLabel}
+                    checkIn={sp.checkIn!}
+                    checkOut={sp.checkOut!}
+                    nights={nights}
+                    rooms={rooms}
+                    adultsPerRoom={adultsPerRoom}
+                    childAges={childAges}
+                  />
+                </Suspense>
+              )}
+            </div>
+
+            {/* ── about ── */}
+            <aside className="h-fit space-y-6">
+              {(info?.checkInTime || info?.checkOutTime) && (
+                <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
+                  <h3 className="mb-2 text-[0.95rem] font-bold text-ink">Check-in / Check-out</h3>
+                  <p className="flex items-center gap-2 text-[0.88rem] text-muted">
+                    <Clock size={14} className="text-red" aria-hidden />
+                    {info.checkInTime ?? "—"} / {info.checkOutTime ?? "—"}
+                  </p>
                 </div>
-              ) : !roomOptions.length ? (
+              )}
+
+              {facilities.length > 0 && (
+                <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
+                  <h3 className="mb-3 text-[0.95rem] font-bold text-ink">Amenities</h3>
+                  <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {facilities.map((f) => (
+                      <li key={f} className="flex items-start gap-1.5 text-[0.83rem] text-muted">
+                        <Check size={14} className="mt-0.5 flex-none text-red" aria-hidden />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {info?.description && (
+                <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
+                  <h3 className="mb-2 text-[0.95rem] font-bold text-ink">About this property</h3>
+                  {/* Supplier text can embed HTML — strip to plain text, never inject. */}
+                  <p className="line-clamp-[14] whitespace-pre-line text-[0.85rem] leading-relaxed text-muted">
+                    {info.description
+                      .replace(/<br\s*\/?>/gi, "\n")
+                      .replace(/<\/p>/gi, "\n\n")
+                      .replace(/<[^>]+>/g, "")
+                      .replace(/&amp;/g, "&")
+                      .replace(/&nbsp;/g, " ")
+                      .trim()}
+                  </p>
+                </div>
+              )}
+            </aside>
+          </div>
+        </Container>
+      </section>
+    </>
+  );
+}
+
+/**
+ * Live room list for one hotel — the slow TBO call, streamed behind Suspense so
+ * the gallery/details above paint instantly.
+ */
+async function RoomOptions({
+  code,
+  name,
+  cityLabel,
+  checkIn,
+  checkOut,
+  nights,
+  rooms,
+  adultsPerRoom,
+  childAges,
+}: {
+  code: string;
+  name: string;
+  cityLabel: string;
+  checkIn: string;
+  checkOut: string;
+  nights: number;
+  rooms: number;
+  adultsPerRoom: number;
+  childAges: number[];
+}) {
+  const searchArgs = {
+    checkInISO: checkIn,
+    checkOutISO: checkOut,
+    hotelCodes: [code],
+    nationality: "IN",
+    rooms: Array.from({ length: rooms }, () => ({
+      adults: adultsPerRoom,
+      childrenAges: childAges.length ? childAges : undefined,
+    })),
+  };
+  let res = await searchHotels({ ...searchArgs, allRoomOptions: true });
+  // TBO's staging occasionally returns an empty result transiently. Fall back to
+  // the capped search (what the results page priced) so the page stays bookable.
+  if (!res.ok || !res.offers.length) {
+    res = await searchHotels(searchArgs);
+  }
+  const offer = res.ok ? res.offers.find((o) => o.hotelCode === code) ?? res.offers[0] : undefined;
+  const roomOptions = offer?.rooms ?? [];
+  const money = new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: offer?.currency || "INR",
+    maximumFractionDigits: 0,
+  });
+
+  return (
+    <>
+      <h2 className="mb-4 text-[1.2rem] font-bold text-ink">Room options ({roomOptions.length})</h2>
+
+      {!roomOptions.length ? (
                 <div className="rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
                   <TriangleAlert className="mx-auto mb-3 text-red" aria-hidden />
                   <p className="mb-1 font-semibold text-ink">No rooms available for these dates</p>
@@ -221,8 +324,8 @@ export default async function HotelDetailPage({
                       bookingCode: room.bookingCode,
                       hotel: name,
                       city: cityLabel,
-                      checkIn: sp.checkIn!,
-                      checkOut: sp.checkOut!,
+                      checkIn,
+                      checkOut,
                       nights: String(nights),
                       rooms: String(rooms),
                       adults: String(adultsPerRoom),
@@ -279,53 +382,6 @@ export default async function HotelDetailPage({
                   })}
                 </div>
               )}
-            </div>
-
-            {/* ── about ── */}
-            <aside className="h-fit space-y-6">
-              {(info?.checkInTime || info?.checkOutTime) && (
-                <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-                  <h3 className="mb-2 text-[0.95rem] font-bold text-ink">Check-in / Check-out</h3>
-                  <p className="flex items-center gap-2 text-[0.88rem] text-muted">
-                    <Clock size={14} className="text-red" aria-hidden />
-                    {info.checkInTime ?? "—"} / {info.checkOutTime ?? "—"}
-                  </p>
-                </div>
-              )}
-
-              {facilities.length > 0 && (
-                <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-                  <h3 className="mb-3 text-[0.95rem] font-bold text-ink">Amenities</h3>
-                  <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                    {facilities.map((f) => (
-                      <li key={f} className="flex items-start gap-1.5 text-[0.83rem] text-muted">
-                        <Check size={14} className="mt-0.5 flex-none text-red" aria-hidden />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {info?.description && (
-                <div className="rounded-brand-lg border border-line bg-white p-5 shadow-brand-sm">
-                  <h3 className="mb-2 text-[0.95rem] font-bold text-ink">About this property</h3>
-                  {/* Supplier text can embed HTML — strip to plain text, never inject. */}
-                  <p className="line-clamp-[14] whitespace-pre-line text-[0.85rem] leading-relaxed text-muted">
-                    {info.description
-                      .replace(/<br\s*\/?>/gi, "\n")
-                      .replace(/<\/p>/gi, "\n\n")
-                      .replace(/<[^>]+>/g, "")
-                      .replace(/&amp;/g, "&")
-                      .replace(/&nbsp;/g, " ")
-                      .trim()}
-                  </p>
-                </div>
-              )}
-            </aside>
-          </div>
-        </Container>
-      </section>
     </>
   );
 }
