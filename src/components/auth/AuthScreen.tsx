@@ -12,7 +12,7 @@ import { cn } from "@/lib/cn";
 const inputWrap =
   "flex items-center gap-2.5 rounded-xl border border-line bg-cream/60 px-4 focus-within:border-red focus-within:bg-white transition-colors";
 const inputCls =
-  "w-full bg-transparent py-3.5 text-[0.95rem] text-ink outline-none placeholder:text-muted/70";
+  "w-full bg-transparent py-3.5 text-base text-ink outline-none placeholder:text-muted/70";
 
 function safeRedirect(): string {
   if (typeof window === "undefined") return "/account";
@@ -164,7 +164,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
                   <button
                     type="button"
                     onClick={() => setShowPw((s) => !s)}
-                    className="flex-none text-muted hover:text-ink"
+                    className="-m-2 flex-none p-2 text-muted hover:text-ink"
                     aria-label={showPw ? "Hide password" : "Show password"}
                   >
                     {showPw ? <EyeOff size={18} /> : <Eye size={18} />}

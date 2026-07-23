@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 export const initialFormState: FormState = { status: "idle", message: "" };
 
 export const controlClass =
-  "w-full rounded-[13px] border-[1.6px] border-line bg-cream px-4 py-3.5 text-[0.96rem] text-ink outline-none transition-all placeholder:text-muted/70 focus:border-red focus:bg-white focus:ring-4 focus:ring-red/15";
+  "w-full rounded-[13px] border-[1.6px] border-line bg-cream px-4 py-3.5 text-base text-ink outline-none transition-all placeholder:text-muted/70 focus:border-red focus:bg-white focus:ring-4 focus:ring-red/15";
 
 export function Field({
   label,

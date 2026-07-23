@@ -142,8 +142,8 @@ export default async function HotelDetailPage({
             )}
           </div>
           {info?.address && (
-            <p className="mt-2 flex items-center gap-1.5 text-[0.9rem] text-white/80">
-              <MapPin size={14} aria-hidden /> {info.address}
+            <p className="mt-2 flex items-start gap-1.5 text-[0.9rem] text-white/80">
+              <MapPin size={14} className="mt-1 flex-none" aria-hidden /> {info.address}
             </p>
           )}
           {hasStay && (
@@ -159,21 +159,20 @@ export default async function HotelDetailPage({
         <Container>
           {/* ── gallery ── */}
           {gallery.length > 0 && (
-            <div className="mb-10 grid gap-2 overflow-hidden rounded-brand-lg sm:grid-cols-4 sm:grid-rows-2">
+            <div className="mb-10 flex snap-x snap-mandatory gap-2 overflow-x-auto rounded-brand-lg sm:grid sm:snap-none sm:grid-cols-4 sm:grid-rows-2 sm:overflow-hidden">
               {gallery.map((src, i) => (
                 <div
                   key={i}
                   className={cn(
-                    "relative h-40 bg-cream sm:h-auto",
+                    "relative h-40 w-[85%] flex-none snap-center overflow-hidden rounded-brand-lg bg-cream sm:h-auto sm:w-auto sm:rounded-none",
                     i === 0 ? "sm:col-span-2 sm:row-span-2 sm:min-h-[21rem]" : "sm:min-h-[10rem]",
-                    i > 0 && "hidden sm:block",
                   )}
                 >
                   <Image
                     src={src}
                     alt={`${name} photo ${i + 1}`}
                     fill
-                    sizes={i === 0 ? "(min-width: 640px) 50vw, 100vw" : "25vw"}
+                    sizes={i === 0 ? "(min-width: 640px) 50vw, 85vw" : "(min-width: 640px) 25vw, 85vw"}
                     className="object-cover"
                     priority={i === 0}
                   />

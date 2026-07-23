@@ -53,7 +53,7 @@ const socials: { label: string; href: string; path: string }[] = [
 
 export function Footer() {
   return (
-    <footer className="relative overflow-hidden bg-navy pt-20 text-white/70">
+    <footer className="relative overflow-hidden bg-navy pt-14 text-white/70 sm:pt-20">
       <div
         className="pointer-events-none absolute -right-28 -top-36 h-[420px] w-[420px] rounded-full"
         style={{
@@ -63,7 +63,7 @@ export function Footer() {
         aria-hidden
       />
       <Container className="relative">
-        <div className="grid gap-12 pb-12 md:grid-cols-2 lg:grid-cols-[1.7fr_1fr_1fr_1.5fr]">
+        <div className="grid gap-10 pb-12 md:grid-cols-2 md:gap-12 lg:grid-cols-[1.7fr_1fr_1fr_1.5fr]">
           {/* About */}
           <div>
             <Link href="/" className="mb-5 inline-flex" aria-label={site.name}>
@@ -87,7 +87,7 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={s.label}
-                  className="grid h-10 w-10 place-items-center rounded-xl bg-white/8 text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-red"
+                  className="grid h-11 w-11 place-items-center rounded-xl bg-white/8 text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-red"
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -107,12 +107,12 @@ export function Footer() {
           {footerCols.map((col) => (
             <div key={col.heading}>
               <h2 className="mb-5 text-[1.05rem] text-white">{col.heading}</h2>
-              <ul className="flex flex-col gap-3">
+              <ul className="flex flex-col gap-1">
                 {col.links.map((l) => (
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="inline-block text-[0.93rem] text-white/65 transition-all duration-200 hover:translate-x-1 hover:text-white"
+                      className="inline-block py-1.5 text-[0.93rem] text-white/65 transition-all duration-200 hover:translate-x-1 hover:text-white"
                     >
                       {l.label}
                     </Link>
@@ -151,7 +151,7 @@ export function Footer() {
               </li>
               <li className="flex gap-3">
                 <Mail size={18} className="flex-none text-silver" aria-hidden />
-                <a href={`mailto:${site.email}`} className="hover:text-white">
+                <a href={`mailto:${site.email}`} className="break-all hover:text-white">
                   {site.email}
                 </a>
               </li>

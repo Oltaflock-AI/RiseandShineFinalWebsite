@@ -32,7 +32,7 @@ export function ServiceCard({
       <p className="text-[0.92rem] text-muted transition-colors duration-300 group-hover:text-white/90">
         {description}
       </p>
-      <span className="mt-3.5 inline-flex items-center gap-1.5 text-[0.85rem] font-semibold text-red opacity-0 transition-all duration-300 group-hover:text-white group-hover:opacity-100">
+      <span className="mt-3.5 inline-flex items-center gap-1.5 text-[0.85rem] font-semibold text-red opacity-100 transition-all duration-300 group-hover:text-white lg:opacity-0 lg:group-hover:opacity-100">
         Learn more
         <ArrowRight size={15} strokeWidth={2.2} aria-hidden />
       </span>

@@ -345,7 +345,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
+    <div className="grid gap-8 pb-24 lg:grid-cols-[1fr_20rem] lg:pb-0">
       {/* ── guests ── */}
       <div className="space-y-6">
         {quote.isPriceChanged && (
@@ -370,7 +370,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                       <select
                         value={g.title}
                         onChange={(e) => setGuest(i, { title: e.target.value })}
-                        className="rounded-brand border border-line bg-white px-3 py-2.5 text-[0.9rem] text-ink"
+                        className="rounded-brand border border-line bg-white px-3 py-2.5 text-base text-ink"
                         aria-label="Title"
                       >
                         {TITLES.map((t) => (
@@ -381,14 +381,14 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                         value={g.first}
                         onChange={(e) => setGuest(i, { first: e.target.value })}
                         placeholder="First name"
-                        className="rounded-brand border border-line px-3 py-2.5 text-[0.9rem]"
+                        className="rounded-brand border border-line px-3 py-2.5 text-base"
                         aria-label="First name"
                       />
                       <input
                         value={g.last}
                         onChange={(e) => setGuest(i, { last: e.target.value })}
                         placeholder="Last name"
-                        className="rounded-brand border border-line px-3 py-2.5 text-[0.9rem]"
+                        className="rounded-brand border border-line px-3 py-2.5 text-base"
                         aria-label="Last name"
                       />
                     </div>
@@ -400,7 +400,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                           value={g.email}
                           onChange={(e) => setGuest(i, { email: e.target.value })}
                           placeholder="Email"
-                          className="rounded-brand border border-line px-3 py-2.5 text-[0.9rem]"
+                          className="rounded-brand border border-line px-3 py-2.5 text-base"
                           aria-label="Email"
                         />
                         <input
@@ -408,7 +408,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                           value={g.phone}
                           onChange={(e) => setGuest(i, { phone: e.target.value })}
                           placeholder="Phone"
-                          className="rounded-brand border border-line px-3 py-2.5 text-[0.9rem]"
+                          className="rounded-brand border border-line px-3 py-2.5 text-base"
                           aria-label="Phone"
                         />
                       </div>
@@ -420,7 +420,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                         onChange={(e) => setGuest(i, { pan: e.target.value.toUpperCase() })}
                         placeholder="PAN (AAAAA9999A)"
                         maxLength={10}
-                        className="mt-3 w-full rounded-brand border border-line px-3 py-2.5 text-[0.9rem] uppercase"
+                        className="mt-3 w-full rounded-brand border border-line px-3 py-2.5 text-base uppercase"
                         aria-label="PAN"
                       />
                     )}
@@ -431,21 +431,21 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
                           value={g.passportNo}
                           onChange={(e) => setGuest(i, { passportNo: e.target.value })}
                           placeholder="Passport no."
-                          className="rounded-brand border border-line px-3 py-2.5 text-[0.9rem]"
+                          className="rounded-brand border border-line px-3 py-2.5 text-base"
                           aria-label="Passport number"
                         />
                         <input
                           type="date"
                           value={g.passportIssue}
                           onChange={(e) => setGuest(i, { passportIssue: e.target.value })}
-                          className="rounded-brand border border-line px-3 py-2.5 text-[0.9rem]"
+                          className="rounded-brand border border-line px-3 py-2.5 text-base"
                           aria-label="Passport issue date"
                         />
                         <input
                           type="date"
                           value={g.passportExp}
                           onChange={(e) => setGuest(i, { passportExp: e.target.value })}
-                          className="rounded-brand border border-line px-3 py-2.5 text-[0.9rem]"
+                          className="rounded-brand border border-line px-3 py-2.5 text-base"
                           aria-label="Passport expiry date"
                         />
                       </div>
@@ -485,7 +485,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
           type="button"
           onClick={submit}
           disabled={booking}
-          className="grad-red mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.9rem] font-semibold text-white shadow-brand-red transition disabled:opacity-60"
+          className="grad-red mt-4 hidden w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.9rem] font-semibold text-white shadow-brand-red transition disabled:opacity-60 lg:inline-flex"
         >
           {booking ? (
             <>
@@ -499,6 +499,29 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
           <ShieldCheck size={12} aria-hidden /> Secure payment · confirmed instantly
         </p>
       </aside>
+
+      {/* Mobile sticky pay bar — the summary card sits below the form on small
+          screens, so surface the total + CTA without scrolling past it. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pr-[84px] backdrop-blur lg:hidden">
+        <div className="min-w-0">
+          <p className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">Total</p>
+          <p className="truncate text-[1.05rem] font-extrabold text-navy">{money.format(amountInr)}</p>
+        </div>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={booking}
+          className="grad-red inline-flex min-h-11 flex-none items-center justify-center gap-2 rounded-full px-5 text-[0.9rem] font-semibold text-white shadow-brand-red disabled:opacity-60"
+        >
+          {booking ? (
+            <>
+              <Loader2 className="animate-spin" size={16} aria-hidden /> Processing…
+            </>
+          ) : (
+            <>Pay &amp; Book</>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

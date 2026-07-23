@@ -74,7 +74,7 @@ export function HeaderAuth({ scrolled }: { scrolled: boolean }) {
             href="/account"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="mt-1 flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[0.9rem] font-medium text-ink transition-colors hover:bg-cream-2 hover:text-red"
+            className="mt-1 flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2.5 text-[0.9rem] font-medium text-ink transition-colors hover:bg-cream-2 hover:text-red"
           >
             <LayoutGrid size={17} aria-hidden /> My account
           </Link>
@@ -84,7 +84,7 @@ export function HeaderAuth({ scrolled }: { scrolled: boolean }) {
               logout();
               setOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-[0.9rem] font-medium text-ink transition-colors hover:bg-cream-2 hover:text-red"
+            className="flex min-h-11 w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-[0.9rem] font-medium text-ink transition-colors hover:bg-cream-2 hover:text-red"
           >
             <LogOut size={17} aria-hidden /> Log out
           </button>
@@ -135,7 +135,7 @@ export function HeaderAuthMobile({ onNavigate }: { onNavigate: () => void }) {
         <Link
           href="/account"
           onClick={onNavigate}
-          className="flex flex-1 items-center justify-center gap-2 rounded-full bg-white/15 py-2.5 text-[0.9rem] font-semibold text-white"
+          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white/15 py-2.5 text-[0.9rem] font-semibold text-white"
         >
           <LayoutGrid size={16} aria-hidden /> Account
         </Link>
@@ -144,7 +144,7 @@ export function HeaderAuthMobile({ onNavigate }: { onNavigate: () => void }) {
             logout();
             onNavigate();
           }}
-          className="flex flex-1 items-center justify-center gap-2 rounded-full bg-white/15 py-2.5 text-[0.9rem] font-semibold text-white"
+          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white/15 py-2.5 text-[0.9rem] font-semibold text-white"
         >
           <LogOut size={16} aria-hidden /> Log out
         </button>

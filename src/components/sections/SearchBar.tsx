@@ -83,7 +83,7 @@ function Field({
 }
 
 const inputCls =
-  "w-full bg-transparent text-[0.95rem] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-muted/70";
+  "w-full bg-transparent text-base font-semibold text-ink outline-none placeholder:font-normal placeholder:text-muted/70";
 
 const iso = (offsetDays: number) => {
   const d = new Date();
@@ -164,7 +164,7 @@ function Stepper({
   max: number;
 }) {
   const btn =
-    "grid h-8 w-8 place-items-center rounded-full border border-line text-ink transition-colors hover:border-red hover:text-red disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink";
+    "grid h-11 w-11 place-items-center rounded-full border border-line text-ink transition-colors hover:border-red hover:text-red disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink lg:h-8 lg:w-8";
   return (
     <div className="flex items-center justify-between py-2">
       <div>
@@ -424,7 +424,7 @@ export function SearchBar({
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <span className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Fare type</span>
                     {FARE_TYPES.map((f) => (
-                      <label key={f} className="flex cursor-pointer items-center gap-1.5 text-[0.85rem] text-ink">
+                      <label key={f} className="flex cursor-pointer items-center gap-1.5 py-2 text-[0.85rem] text-ink lg:py-0">
                         <input
                           type="radio"
                           name="fare"
@@ -440,7 +440,7 @@ export function SearchBar({
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2 lg:ml-auto">
-                    <label className="flex items-center gap-2 text-[0.85rem] font-medium text-ink">
+                    <label className="flex items-center gap-2 py-2 text-[0.85rem] font-medium text-ink lg:py-0">
                       <Plane size={15} className="text-red" aria-hidden />
                       <select
                         value={airline}
@@ -453,12 +453,12 @@ export function SearchBar({
                         ))}
                       </select>
                     </label>
-                    <label className="flex cursor-pointer items-center gap-2 text-[0.85rem] font-medium text-ink">
+                    <label className="flex cursor-pointer items-center gap-2 py-2 text-[0.85rem] font-medium text-ink lg:py-0">
                       <input
                         type="checkbox"
                         checked={nonStop}
                         onChange={(e) => setNonStop(e.target.checked)}
-                        className="h-4 w-4 accent-red"
+                        className="h-5 w-5 accent-red lg:h-4 lg:w-4"
                       />
                       Non-stop only
                     </label>

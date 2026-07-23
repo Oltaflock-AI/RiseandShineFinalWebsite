@@ -52,7 +52,7 @@ export default function AboutPage() {
                   className="h-auto w-full object-cover"
                 />
               </div>
-              <div className="absolute -bottom-6 -right-3 flex items-center gap-3.5 rounded-2xl bg-white p-4 pr-6 shadow-brand sm:-right-6">
+              <div className="absolute -bottom-4 right-3 flex items-center gap-3.5 rounded-2xl bg-white p-4 pr-6 shadow-brand sm:-bottom-6 sm:-right-6">
                 <span className="grad-red grid h-12 w-12 place-items-center rounded-xl text-lg font-extrabold text-white">
                   15+
                 </span>

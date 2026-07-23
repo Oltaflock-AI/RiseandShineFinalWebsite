@@ -18,7 +18,7 @@ export function InfoCard({
       </span>
       <div className="min-w-0">
         <h3 className="mb-1 text-[1.05rem]">{title}</h3>
-        <div className="text-[0.92rem] leading-relaxed text-muted [&_a]:font-semibold [&_a]:text-red [&_a:hover]:underline">
+        <div className="break-words text-[0.92rem] leading-relaxed text-muted [&_a]:font-semibold [&_a]:text-red [&_a:hover]:underline">
           {children}
         </div>
       </div>

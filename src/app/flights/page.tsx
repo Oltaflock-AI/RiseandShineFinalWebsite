@@ -155,7 +155,7 @@ export default async function FlightsPage({
     return `/flights?${p.toString()}`;
   };
   const sortChip = (active: boolean) =>
-    `rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors ${
+    `rounded-full border px-3.5 py-2.5 text-[0.82rem] font-semibold transition-colors ${
       active ? "border-red bg-red/10 text-red" : "border-line text-ink hover:border-red/50"
     }`;
 
@@ -218,7 +218,7 @@ export default async function FlightsPage({
             </div>
           ) : (
             <>
-              <div className="mb-4 flex items-center gap-1.5">
+              <div className="mb-4 flex flex-wrap items-center gap-1.5 gap-y-2">
                 <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Sort</span>
                 <Link href={sortHref("price")} className={sortChip(sort === "price")}>Cheapest</Link>
                 <Link href={sortHref("dur")} className={sortChip(sort === "dur")}>Fastest</Link>

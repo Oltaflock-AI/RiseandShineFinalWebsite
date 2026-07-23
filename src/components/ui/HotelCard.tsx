@@ -124,9 +124,9 @@ export function HotelCard({
         )}
 
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.82rem] text-muted">
-          <span className="inline-flex items-center gap-1">
-            <BedDouble size={14} className="text-red" aria-hidden />
-            {cheapest?.name || "Room"}
+          <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+            <BedDouble size={14} className="flex-none text-red" aria-hidden />
+            <span className="truncate">{cheapest?.name || "Room"}</span>
           </span>
           {cheapest?.mealType && cheapest.mealType.toLowerCase() !== "room only" && (
             <span className="inline-flex items-center gap-1">
@@ -156,7 +156,7 @@ export function HotelCard({
         <div className="flex items-center gap-3">
           <Link
             href={detailHref}
-            className="inline-flex items-center gap-1 text-[0.85rem] font-semibold text-red hover:underline"
+            className="inline-flex min-h-11 items-center gap-1 text-[0.85rem] font-semibold text-red hover:underline"
           >
             View rooms <ArrowRight size={13} strokeWidth={2.2} aria-hidden />
           </Link>

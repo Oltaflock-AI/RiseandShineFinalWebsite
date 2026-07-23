@@ -101,7 +101,7 @@ export default async function HotelsPage({
                   <Link
                     key={c.cityCode}
                     href={`/hotels?city=${c.cityCode}`}
-                    className="rounded-full border border-line px-4 py-1.5 text-[0.85rem] font-semibold text-ink hover:border-red hover:text-red"
+                    className="rounded-full border border-line px-4 py-2.5 text-[0.85rem] font-semibold text-ink hover:border-red hover:text-red"
                   >
                     {c.label}
                   </Link>
@@ -168,7 +168,7 @@ export default async function HotelsPage({
   ].join("&");
 
   const chip = (active: boolean) =>
-    `rounded-full border px-3.5 py-1.5 text-[0.82rem] font-semibold transition-colors ${
+    `rounded-full border px-3.5 py-2.5 text-[0.82rem] font-semibold transition-colors ${
       active ? "border-red bg-red/10 text-red" : "border-line text-ink hover:border-red/50"
     }`;
 
@@ -198,7 +198,7 @@ export default async function HotelsPage({
             <>
               {/* filter / sort rail */}
               <div className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-3">
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Stars</span>
                   {[0, 3, 4, 5].map((s) => (
                     <Link key={s} href={qs({ stars: s ? String(s) : "" })} className={chip(minStars === s)}>
@@ -206,7 +206,7 @@ export default async function HotelsPage({
                     </Link>
                   ))}
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <Link href={qs({ refundable: refundableOnly ? "" : "1" })} className={chip(refundableOnly)}>
                     Free cancellation
                   </Link>
@@ -217,7 +217,7 @@ export default async function HotelsPage({
                     Room only
                   </Link>
                 </div>
-                <div className="ml-auto flex items-center gap-1.5">
+                <div className="ml-auto flex flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-[0.75rem] font-bold uppercase tracking-wide text-muted">Sort</span>
                   <Link href={qs({ sort: "" })} className={chip(sort === "price")}>
                     Price ↑

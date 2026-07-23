@@ -259,7 +259,7 @@ export function LightItineraryDetail({ it }: { it: LightItinerary }) {
       </section>
 
       {/* Mobile sticky enquire bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-white/95 px-4 py-3 pr-[84px] shadow-[0_-6px_24px_rgba(8,50,73,0.1)] backdrop-blur lg:hidden">
+      <div className="sticky inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-line bg-white/95 px-4 py-3 pr-[84px] shadow-[0_-6px_24px_rgba(8,50,73,0.1)] backdrop-blur lg:hidden">
         <div className="min-w-0 flex-1">
           <div className="truncate text-[0.9rem] font-bold text-ink">{it.name}</div>
           <div className="text-[0.75rem] text-muted">

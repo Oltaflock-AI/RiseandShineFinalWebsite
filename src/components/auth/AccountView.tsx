@@ -207,7 +207,7 @@ export function AccountView() {
                           <button
                             onClick={() => cancelHotel(bk)}
                             disabled={cancelling === bk.id}
-                            className="mt-1 text-[0.75rem] font-semibold text-red underline-offset-2 hover:underline disabled:opacity-60"
+                            className="mt-1 py-2 text-[0.75rem] font-semibold text-red underline-offset-2 hover:underline disabled:opacity-60"
                           >
                             {cancelling === bk.id ? "Cancelling…" : "Cancel booking"}
                           </button>

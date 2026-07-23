@@ -130,7 +130,7 @@ const blankPax = (t: PaxType): PaxForm => ({
 });
 
 const field =
-  "w-full rounded-brand border border-line bg-white px-3 py-2 text-[0.9rem] text-ink outline-none transition focus:border-red focus:ring-2 focus:ring-red/15";
+  "w-full rounded-brand border border-line bg-white px-3 py-2.5 text-base text-ink outline-none transition focus:border-red focus:ring-2 focus:ring-red/15";
 const label = "mb-1 block text-[0.75rem] font-semibold uppercase tracking-wide text-muted";
 
 export function BookingForm({
@@ -428,7 +428,7 @@ export function BookingForm({
           </div>
           <div className="flex justify-between gap-4 border-b border-line pb-2">
             <dt className="text-muted">Ticket number</dt>
-            <dd className="font-semibold text-ink">{booked.ticketNumbers?.join(", ") || booked.pnr}</dd>
+            <dd className="min-w-0 break-words text-right font-semibold text-ink">{booked.ticketNumbers?.join(", ") || booked.pnr}</dd>
           </div>
           <div className="flex justify-between gap-4 border-b border-line pb-2">
             <dt className="text-muted">Invoice</dt>
@@ -449,7 +449,7 @@ export function BookingForm({
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
+    <div className="grid gap-8 pb-24 lg:grid-cols-[1fr_20rem] lg:pb-0">
       {/* ── passengers ── */}
       <div className="space-y-6">
         {quote.priceChanged && (
@@ -556,6 +556,7 @@ export function BookingForm({
                     <label className={label}>PAN (as per the PAN card)</label>
                     <input
                       className={field}
+                      autoCapitalize="characters"
                       value={p.PAN}
                       onChange={(e) => set(i, "PAN", e.target.value.toUpperCase())}
                       placeholder="ABCDE1234F"
@@ -582,6 +583,7 @@ export function BookingForm({
                       />
                       <input
                         className={field}
+                        autoCapitalize="characters"
                         value={p.GuardianPAN}
                         onChange={(e) => set(i, "GuardianPAN", e.target.value.toUpperCase())}
                         placeholder="Guardian PAN"
@@ -607,6 +609,8 @@ export function BookingForm({
                 </span>
                 <input
                   className={field}
+                  type="tel"
+                  inputMode="tel"
                   value={contact.phone}
                   onChange={(e) => setContact({ ...contact, phone: e.target.value })}
                   placeholder="9876543210"
@@ -617,6 +621,7 @@ export function BookingForm({
               <label className={label}>Email</label>
               <input
                 className={field}
+                type="email"
                 value={contact.email}
                 onChange={(e) => setContact({ ...contact, email: e.target.value })}
               />
@@ -685,7 +690,7 @@ export function BookingForm({
             type="button"
             disabled={!canSubmit}
             onClick={submit}
-            className="grad-red inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.9rem] font-semibold text-white shadow-brand-red transition-transform duration-300 hover:-translate-y-[2px] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+            className="grad-red hidden w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.9rem] font-semibold text-white shadow-brand-red transition-transform duration-300 hover:-translate-y-[2px] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 lg:inline-flex"
           >
             {booking ? (
               <>
@@ -700,6 +705,29 @@ export function BookingForm({
           </p>
         </div>
       </aside>
+
+      {/* Mobile sticky pay bar — the summary card sits below the form on small
+          screens, so surface the total + CTA without scrolling past it. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-line bg-white/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pr-[84px] backdrop-blur lg:hidden">
+        <div className="min-w-0">
+          <p className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">Total</p>
+          <p className="truncate text-[1.05rem] font-extrabold text-navy">₹{inr.format(totalFare)}</p>
+        </div>
+        <button
+          type="button"
+          disabled={!canSubmit}
+          onClick={submit}
+          className="grad-red inline-flex min-h-11 flex-none items-center justify-center gap-2 rounded-full px-5 text-[0.9rem] font-semibold text-white shadow-brand-red disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {booking ? (
+            <>
+              <Loader2 size={15} className="animate-spin" aria-hidden /> Processing…
+            </>
+          ) : (
+            <>Pay &amp; issue ticket</>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

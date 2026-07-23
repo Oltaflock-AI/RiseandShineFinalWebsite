@@ -150,7 +150,7 @@ export function Header() {
       {/* Mobile menu */}
       <div
         className={cn(
-          "grad-navy fixed inset-0 z-50 flex flex-col px-8 pb-10 pt-24 transition-transform duration-300 lg:hidden",
+          "grad-navy fixed inset-0 z-50 flex flex-col overflow-y-auto overscroll-contain px-8 pb-10 pt-24 transition-transform duration-300 lg:hidden",
           menuOpen ? "translate-x-0" : "translate-x-full",
         )}
         aria-hidden={!menuOpen}
@@ -178,7 +178,7 @@ export function Header() {
                     <Link
                       key={child.href}
                       href={child.href}
-                      className="py-1.5 text-[0.95rem] text-white/80"
+                      className="flex min-h-11 items-center text-[0.95rem] text-white/80"
                     >
                       {child.label}
                     </Link>
