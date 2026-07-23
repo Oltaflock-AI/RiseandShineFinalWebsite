@@ -25,6 +25,7 @@ import { POPULAR_CITIES, type HotelCity } from "@/data/hotel-cities";
 import { Container } from "../ui/Container";
 import { Button } from "../ui/Button";
 import { cn } from "@/lib/cn";
+import { formatDate } from "@/lib/format-date";
 
 const CABINS = ["Economy", "Premium Economy", "Business", "First"] as const;
 const FARE_TYPES = ["Regular", "Student", "Senior citizen", "Defence"] as const;
@@ -89,6 +90,63 @@ const iso = (offsetDays: number) => {
   d.setDate(d.getDate() + offsetDays);
   return d.toISOString().slice(0, 10);
 };
+
+/**
+ * Native date pickers render in the browser's locale (often MM-DD-YY), which
+ * breaks the site-wide DD-MM-YY rule. The real `<input type="date">` stays on
+ * top (invisible) so the calendar/keyboard still work; the visible text is
+ * always formatDate()'s DD-MM-YY.
+ */
+function DateInput({
+  value,
+  onChange,
+  min,
+  disabled,
+  className,
+  "aria-label": ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  min?: string;
+  disabled?: boolean;
+  className?: string;
+  "aria-label": string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div className={cn("relative", className)}>
+      <span
+        aria-hidden
+        className={cn(
+          "block text-[0.95rem] font-semibold text-ink",
+          !value && "font-normal text-muted/70",
+        )}
+      >
+        {value ? formatDate(value) : "dd-mm-yy"}
+      </span>
+      <input
+        ref={ref}
+        type="date"
+        value={value}
+        min={min}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        onClick={() => {
+          try {
+            ref.current?.showPicker();
+          } catch {
+            /* needs a user gesture; typing still works */
+          }
+        }}
+        aria-label={ariaLabel}
+        className={cn(
+          "absolute inset-0 h-full w-full opacity-0",
+          disabled ? "cursor-not-allowed" : "cursor-pointer",
+        )}
+      />
+    </div>
+  );
+}
 
 function Stepper({
   label,
@@ -280,24 +338,20 @@ export function SearchBar({
                     </label>
                   </Field>
                   <Field label="Depart">
-                    <input
-                      type="date"
+                    <DateInput
                       value={depart}
                       min={today || undefined}
-                      onChange={(e) => setDepart(e.target.value)}
+                      onChange={setDepart}
                       aria-label="Departure date"
-                      className={inputCls}
                     />
                   </Field>
                   <Field label="Return" className={trip === "oneway" ? "opacity-40" : undefined}>
-                    <input
-                      type="date"
+                    <DateInput
                       value={ret}
                       min={depart || today || undefined}
                       disabled={trip === "oneway"}
-                      onChange={(e) => setRet(e.target.value)}
+                      onChange={setRet}
                       aria-label="Return date"
-                      className={inputCls}
                     />
                   </Field>
 
@@ -548,13 +602,13 @@ function HotelsPanel() {
         <Field label="Check-in">
           <div className="flex items-center gap-2">
             <CalendarDays size={17} className="flex-none text-red" aria-hidden />
-            <input type="date" value={checkIn} min={today || undefined} onChange={(e) => setCheckIn(e.target.value)} aria-label="Check-in date" className={inputCls} />
+            <DateInput className="flex-1" value={checkIn} min={today || undefined} onChange={setCheckIn} aria-label="Check-in date" />
           </div>
         </Field>
         <Field label="Check-out">
           <div className="flex items-center gap-2">
             <CalendarDays size={17} className="flex-none text-red" aria-hidden />
-            <input type="date" value={checkOut} min={checkIn || today || undefined} onChange={(e) => setCheckOut(e.target.value)} aria-label="Check-out date" className={inputCls} />
+            <DateInput className="flex-1" value={checkOut} min={checkIn || today || undefined} onChange={setCheckOut} aria-label="Check-out date" />
           </div>
         </Field>
         {/* Guests & rooms — popover mirroring the flights travellers control */}
