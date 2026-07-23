@@ -80,7 +80,7 @@ export function AuthScreen({ mode }: { mode: "login" | "signup" }) {
               alt="Rise & Shine Travels"
               width={200}
               height={75}
-              className="relative h-11 w-auto"
+              className="relative h-11 w-auto self-start"
             />
             <div className="relative">
               <p className="text-script text-3xl text-white/90">Welcome aboard</p>
