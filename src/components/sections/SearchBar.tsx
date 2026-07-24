@@ -30,7 +30,7 @@ import { Button } from "../ui/Button";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format-date";
 import { saveRecentSearch } from "@/lib/recent-searches";
-import { track } from "@vercel/analytics";
+import { trackEvent } from "@/lib/analytics";
 
 const CABINS = ["Economy", "Premium Economy", "Business", "First"] as const;
 const FARE_TYPES = ["Regular", "Student", "Senior citizen", "Defence"] as const;
@@ -279,6 +279,7 @@ export function SearchBar({
       label: `${from.trim() || "Ahmedabad (AMD)"} → ${to.trim()}${depart ? ` · ${formatDate(depart)}` : ""}`,
       url,
     });
+    trackEvent("search", { kind: "flight", search_term: `${from.trim()} → ${to.trim()}` });
     startSearch(() => router.push(url));
   };
 
@@ -646,6 +647,7 @@ function HotelsPanel() {
       label: `${match ? match.label : city.trim()}${checkIn ? ` · ${formatDate(checkIn)}` : ""}`,
       url,
     });
+    trackEvent("search", { kind: "hotel", search_term: match ? match.label : city.trim() });
     startSearch(() => router.push(url));
   };
 
