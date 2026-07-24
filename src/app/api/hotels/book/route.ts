@@ -3,6 +3,13 @@ import type { HotelValidationInfo } from "@/lib/tbo-hotel";
 import { getUser } from "@/lib/supabase/server";
 import { saveHotelBookingHistory, type HotelStay } from "@/lib/booking-history";
 import {
+  emailConfigured,
+  sendEmail,
+  hotelLeadEmail,
+  hotelConfirmationEmail,
+  refundNoticeEmail,
+} from "@/lib/email";
+import {
   razorpayConfigured,
   verifyPaymentSignature,
   fetchPayment,
@@ -99,6 +106,23 @@ export async function POST(req: Request) {
       await refundPayment(payment.paymentId, {
         notes: { reason: "hotel_book_failed", bookingCode: request.bookingCode, orderId: payment.orderId },
       });
+      // Tell the guest their money is coming back. Best-effort — the refund
+      // above already succeeded and must be reported regardless.
+      const to = hotelLeadEmail(request);
+      if (emailConfigured && to) {
+        try {
+          await sendEmail({
+            to,
+            ...refundNoticeEmail({
+              kind: "hotel",
+              amountInr: Math.round(request.netAmount),
+              reference: payment.paymentId,
+            }),
+          });
+        } catch (e) {
+          console.error("[api/hotels/book] refund email failed (refund unaffected):", e);
+        }
+      }
       return Response.json(
         { ...result, refunded: true, error: `${result.error ?? "Booking failed."} Your payment has been refunded.` },
         { status: result.rule ? 422 : 502 },
@@ -137,6 +161,19 @@ export async function POST(req: Request) {
       }
     } catch (e) {
       console.error("[api/hotels/book] booking-history write failed (booking unaffected):", e);
+    }
+    // Confirmation email to the lead guest — best-effort, awaited before the
+    // response (serverless may freeze after return), never fails the booking.
+    const to = hotelLeadEmail(request);
+    if (emailConfigured && to) {
+      try {
+        await sendEmail({
+          to,
+          ...hotelConfirmationEmail(request, body.stay ?? {}, result, Math.round(request.netAmount)),
+        });
+      } catch (e) {
+        console.error("[api/hotels/book] confirmation email failed (booking unaffected):", e);
+      }
     }
   }
 

@@ -3,6 +3,13 @@ import { parseBookingRequest, type IncomingBooking } from "@/lib/booking-request
 import { getUser } from "@/lib/supabase/server";
 import { saveBookingHistory } from "@/lib/booking-history";
 import {
+  emailConfigured,
+  sendEmail,
+  flightLeadEmail,
+  flightConfirmationEmail,
+  refundNoticeEmail,
+} from "@/lib/email";
+import {
   razorpayConfigured,
   verifyPaymentSignature,
   fetchPayment,
@@ -87,6 +94,19 @@ export async function POST(req: Request) {
       await refundPayment(payment.paymentId, {
         notes: { reason: "ticketing_failed", traceId: bookingReq.traceId, orderId: payment.orderId },
       });
+      // Tell the customer their money is coming back. Best-effort — the refund
+      // above already succeeded and must be reported regardless.
+      const to = flightLeadEmail(bookingReq);
+      if (emailConfigured && to) {
+        try {
+          await sendEmail({
+            to,
+            ...refundNoticeEmail({ kind: "flight", amountInr: payment.amountInr, reference: payment.paymentId }),
+          });
+        } catch (e) {
+          console.error("[api/book] refund email failed (refund unaffected):", e);
+        }
+      }
       return Response.json(
         { ...result, refunded: true, error: `${result.error ?? "Booking failed."} Your payment has been refunded.` },
         { status: result.rule ? 422 : 502 },
@@ -119,6 +139,19 @@ export async function POST(req: Request) {
       if (user) await saveBookingHistory(user.id, bookingReq, result, payment ?? undefined);
     } catch (e) {
       console.error("[api/book] booking-history write failed (ticket unaffected):", e);
+    }
+    // Confirmation email to the lead passenger — best-effort, awaited before the
+    // response (serverless may freeze after return), never fails the booking.
+    const to = flightLeadEmail(bookingReq);
+    if (emailConfigured && to) {
+      try {
+        await sendEmail({
+          to,
+          ...flightConfirmationEmail(bookingReq, result, payment?.amountInr ?? result.fareInr),
+        });
+      } catch (e) {
+        console.error("[api/book] confirmation email failed (ticket unaffected):", e);
+      }
     }
   }
 
