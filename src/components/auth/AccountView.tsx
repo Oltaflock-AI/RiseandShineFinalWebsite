@@ -2,13 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BedDouble, LogOut, PlaneTakeoff, Ticket } from "lucide-react";
+import {
+  BedDouble,
+  ChevronDown,
+  LogOut,
+  MessageCircle,
+  PlaneTakeoff,
+  Ticket,
+  Users,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createClient, supabaseConfigured } from "@/lib/supabase/client";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { PlaneLoader } from "@/components/ui/PlaneLoader";
 import { formatDate } from "@/lib/format-date";
+import { site } from "@/data/site";
+import { cn } from "@/lib/cn";
 
 /** One row of the customer's booking mirror (see migrations 0001/0002/0004). */
 type BookingRow = {
@@ -19,12 +29,14 @@ type BookingRow = {
   booking_id: number | null;
   fare_inr: number | null;
   amount_paid_inr: number | null;
+  razorpay_payment_id: string | null;
   // flight
   pnr: string | null;
   origin: string | null;
   destination: string | null;
   depart_date: string | null;
   airline_code: string | null;
+  flight_number: string | null;
   ticket_numbers: string[] | null;
   // hotel
   hotel_name: string | null;
@@ -35,18 +47,85 @@ type BookingRow = {
   confirmation_no: string | null;
 };
 
+type PaxRow = {
+  title: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  pax_type: number | null;
+  ticket_number: string | null;
+  is_lead: boolean | null;
+};
+
+const BOOKING_COLUMNS =
+  "id, kind, created_at, status, booking_id, fare_inr, amount_paid_inr, razorpay_payment_id, " +
+  "pnr, origin, destination, depart_date, airline_code, flight_number, ticket_numbers, " +
+  "hotel_name, city, check_in, check_out, rooms, confirmation_no";
+
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 const fmtDate = formatDate;
+
+/** The date that decides upcoming vs past (travel date, not booked-on). */
+const travelDate = (bk: BookingRow) =>
+  (bk.kind === "hotel" ? bk.check_in : bk.depart_date) ?? null;
+
+/**
+ * Human status. Hotels persist 1 = confirmed and flip to 6 on a cancellation
+ * request; flights mirror TBO's itinerary Status (5 = ticketed).
+ */
+function statusOf(bk: BookingRow): { label: string; tone: "good" | "warn" | "bad" } {
+  if (bk.status === 6) return { label: "Cancellation requested", tone: "bad" };
+  if (bk.kind === "hotel") {
+    return bk.status === 1
+      ? { label: "Confirmed", tone: "good" }
+      : { label: "Processing", tone: "warn" };
+  }
+  return bk.status === 5
+    ? { label: "Ticketed", tone: "good" }
+    : { label: "Confirmed", tone: "good" };
+}
+
+function StatusBadge({ bk }: { bk: BookingRow }) {
+  const s = statusOf(bk);
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.72rem] font-bold",
+        s.tone === "good" && "bg-emerald-100 text-emerald-800",
+        s.tone === "warn" && "bg-amber-100 text-amber-800",
+        s.tone === "bad" && "bg-red/10 text-red",
+      )}
+    >
+      {s.label}
+    </span>
+  );
+}
+
+/** WhatsApp deep link asking the agency to cancel a flight (no self-serve TBO air cancel). */
+function flightCancelHref(bk: BookingRow): string {
+  const text = `Hi Rise & Shine! I'd like to request cancellation of my flight booking:
+${bk.origin ?? ""} → ${bk.destination ?? ""} on ${fmtDate(bk.depart_date)}${bk.pnr ? `\nPNR: ${bk.pnr}` : ""}${bk.booking_id ? `\nBooking id: ${bk.booking_id}` : ""}
+Please let me know the cancellation charges and refund.`;
+  return `https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(text)}`;
+}
+
+const PAX_TYPE: Record<number, string> = { 1: "Adult", 2: "Child", 3: "Infant" };
 
 export function AccountView() {
   const { user, ready, logout } = useAuth();
   const router = useRouter();
   const [bookings, setBookings] = useState<BookingRow[] | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [paxByBooking, setPaxByBooking] = useState<Record<string, PaxRow[] | "loading">>({});
 
   /** Request a TBO cancellation; the server enforces ownership. */
   async function cancelHotel(bk: BookingRow) {
-    if (!window.confirm(`Cancel ${bk.hotel_name ?? "this hotel booking"}? Cancellation charges may apply per the rate's policy.`)) return;
+    if (
+      !window.confirm(
+        `Cancel ${bk.hotel_name ?? "this hotel booking"}? Cancellation charges may apply per the rate's policy.`,
+      )
+    )
+      return;
     setCancelling(bk.id);
     try {
       const r = await fetch("/api/hotels/cancel", {
@@ -67,27 +146,42 @@ export function AccountView() {
     }
   }
 
+  /** Expand a booking; lazily pull its passengers (RLS: via owned booking). */
+  function toggleExpand(bk: BookingRow) {
+    setExpanded((e) => (e === bk.id ? null : bk.id));
+    if (!paxByBooking[bk.id] && supabaseConfigured) {
+      setPaxByBooking((m) => ({ ...m, [bk.id]: "loading" }));
+      createClient()
+        .from("passengers")
+        .select("title, first_name, last_name, pax_type, ticket_number, is_lead")
+        .eq("booking_id", bk.id)
+        .order("is_lead", { ascending: false })
+        .then(({ data, error }) => {
+          setPaxByBooking((m) => ({ ...m, [bk.id]: error ? [] : ((data ?? []) as PaxRow[]) }));
+        });
+    }
+  }
+
   useEffect(() => {
     if (ready && !user) router.replace("/login?redirect=/account");
   }, [ready, user, router]);
 
   // RLS limits the select to the caller's own rows (policy in 0001).
   useEffect(() => {
-    if (!ready || !user || !supabaseConfigured) {
-      if (ready) setBookings([]);
-      return;
-    }
+    if (!ready || !user) return;
     let alive = true;
-    createClient()
-      .from("bookings")
-      .select(
-        "id, kind, created_at, status, booking_id, fare_inr, amount_paid_inr, pnr, origin, destination, depart_date, airline_code, ticket_numbers, hotel_name, city, check_in, check_out, rooms, confirmation_no",
-      )
-      .order("created_at", { ascending: false })
-      .limit(50)
-      .then(({ data, error }) => {
-        if (alive) setBookings(error ? [] : ((data ?? []) as BookingRow[]));
-      });
+    (async () => {
+      if (!supabaseConfigured) {
+        if (alive) setBookings([]);
+        return;
+      }
+      const { data, error } = await createClient()
+        .from("bookings")
+        .select(BOOKING_COLUMNS)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (alive) setBookings(error ? [] : ((data ?? []) as unknown as BookingRow[]));
+    })();
     return () => {
       alive = false;
     };
@@ -100,6 +194,166 @@ export function AccountView() {
       </div>
     );
   }
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  // A booking with no travel date (defensive) stays visible under Upcoming.
+  const upcoming = (bookings ?? []).filter((b) => (travelDate(b) ?? "9999") >= todayISO);
+  const past = (bookings ?? []).filter((b) => (travelDate(b) ?? "9999") < todayISO);
+
+  const renderBooking = (bk: BookingRow) => {
+    const open = expanded === bk.id;
+    const pax = paxByBooking[bk.id];
+    return (
+      <li key={bk.id} className="rounded-brand border border-line">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => toggleExpand(bk)}
+            aria-expanded={open}
+            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          >
+            {bk.kind === "hotel" ? (
+              <BedDouble size={18} className="flex-none text-red" aria-hidden />
+            ) : (
+              <PlaneTakeoff size={18} className="flex-none text-red" aria-hidden />
+            )}
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-ink">
+                {bk.kind === "hotel"
+                  ? bk.hotel_name || "Hotel booking"
+                  : `${bk.origin ?? ""} → ${bk.destination ?? ""}${bk.airline_code ? ` · ${bk.airline_code}` : ""}`}
+                <span className="ml-2 inline-block align-middle">
+                  <StatusBadge bk={bk} />
+                </span>
+              </p>
+              <p className="text-[0.82rem] text-muted">
+                {bk.kind === "hotel" ? (
+                  <>
+                    {bk.city ? `${bk.city} · ` : ""}
+                    {fmtDate(bk.check_in)} → {fmtDate(bk.check_out)}
+                    {bk.rooms ? ` · ${bk.rooms} room${bk.rooms > 1 ? "s" : ""}` : ""}
+                  </>
+                ) : (
+                  <>{fmtDate(bk.depart_date)}</>
+                )}
+              </p>
+            </div>
+            <ChevronDown
+              size={16}
+              className={cn("ml-1 flex-none text-muted transition-transform", open && "rotate-180")}
+              aria-hidden
+            />
+          </button>
+          <div className="text-right">
+            <p className="text-[0.82rem] font-bold tracking-wide text-navy">
+              {bk.kind === "hotel" ? bk.confirmation_no || "—" : bk.pnr || "—"}
+            </p>
+            <p className="text-[0.78rem] text-muted">
+              {bk.amount_paid_inr != null || bk.fare_inr != null
+                ? `₹${inr.format(bk.amount_paid_inr ?? bk.fare_inr ?? 0)}`
+                : ""}
+            </p>
+          </div>
+        </div>
+
+        {open && (
+          <div className="border-t border-line bg-cream/40 px-4 py-3 text-[0.85rem]">
+            <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+              <div>
+                <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Booked on</dt>
+                <dd className="text-ink">{fmtDate(bk.created_at)}</dd>
+              </div>
+              {bk.kind === "flight" && bk.flight_number && (
+                <div>
+                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Flight</dt>
+                  <dd className="text-ink">{bk.flight_number}</dd>
+                </div>
+              )}
+              {bk.booking_id != null && (
+                <div>
+                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Booking id</dt>
+                  <dd className="text-ink">{bk.booking_id}</dd>
+                </div>
+              )}
+              {bk.amount_paid_inr != null && (
+                <div>
+                  <dt className="text-[0.72rem] font-bold uppercase tracking-wide text-muted">Payment</dt>
+                  <dd className="text-ink">
+                    ₹{inr.format(bk.amount_paid_inr)} paid online
+                    {bk.razorpay_payment_id ? ` · ${bk.razorpay_payment_id}` : ""}
+                  </dd>
+                </div>
+              )}
+            </dl>
+
+            {/* Travellers / guests on this booking */}
+            <div className="mt-3">
+              <p className="flex items-center gap-1.5 text-[0.72rem] font-bold uppercase tracking-wide text-muted">
+                <Users size={13} aria-hidden /> {bk.kind === "hotel" ? "Guests" : "Passengers"}
+              </p>
+              {pax === "loading" || pax === undefined ? (
+                <p className="mt-1 text-muted">Loading…</p>
+              ) : pax.length === 0 ? (
+                <p className="mt-1 text-muted">Traveller details are with our team.</p>
+              ) : (
+                <ul className="mt-1 space-y-1">
+                  {pax.map((p, i) => (
+                    <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-ink">
+                      <span className="font-semibold">
+                        {[p.title, p.first_name, p.last_name].filter(Boolean).join(" ")}
+                      </span>
+                      <span className="text-[0.78rem] text-muted">
+                        {PAX_TYPE[p.pax_type ?? 0] ?? ""}
+                        {p.is_lead ? " · Lead" : ""}
+                        {p.ticket_number ? ` · Ticket ${p.ticket_number}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Manage */}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {bk.status !== 6 &&
+                (bk.kind === "hotel" ? (
+                  bk.booking_id != null && (
+                    <button
+                      onClick={() => cancelHotel(bk)}
+                      disabled={cancelling === bk.id}
+                      className="rounded-full border-[1.6px] border-red/60 px-4 py-2 text-[0.8rem] font-semibold text-red transition-colors hover:bg-red/5 disabled:opacity-60"
+                    >
+                      {cancelling === bk.id ? "Cancelling…" : "Cancel booking"}
+                    </button>
+                  )
+                ) : (
+                  <a
+                    href={flightCancelHref(bk)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border-[1.6px] border-red/60 px-4 py-2 text-[0.8rem] font-semibold text-red transition-colors hover:bg-red/5"
+                  >
+                    <MessageCircle size={14} aria-hidden /> Request cancellation
+                  </a>
+                ))}
+              <a
+                href={`https://wa.me/${site.phone.whatsapp}?text=${encodeURIComponent(
+                  `Hi! I have a question about my ${bk.kind} booking ${
+                    bk.kind === "hotel" ? bk.confirmation_no ?? "" : bk.pnr ?? ""
+                  }`.trim(),
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[0.8rem] font-semibold text-ink underline underline-offset-4 hover:text-red"
+              >
+                Get help with this booking
+              </a>
+            </div>
+          </div>
+        )}
+      </li>
+    );
+  };
 
   return (
     <>
@@ -119,7 +373,7 @@ export function AccountView() {
 
       <section className="py-12 sm:py-16">
         <Container>
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+          <div className="grid items-start gap-6 lg:grid-cols-[1fr_1.4fr]">
             {/* Profile */}
             <div className="rounded-brand-lg border border-line bg-white p-6 shadow-brand-sm">
               <h2 className="text-[1.05rem] font-bold text-ink">Profile</h2>
@@ -163,62 +417,28 @@ export function AccountView() {
                   </Button>
                 </div>
               ) : (
-                <ul className="mt-4 space-y-3">
-                  {bookings.map((bk) => (
-                    <li
-                      key={bk.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-brand border border-line px-4 py-3"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        {bk.kind === "hotel" ? (
-                          <BedDouble size={18} className="flex-none text-red" aria-hidden />
-                        ) : (
-                          <PlaneTakeoff size={18} className="flex-none text-red" aria-hidden />
-                        )}
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-ink">
-                            {bk.kind === "hotel"
-                              ? bk.hotel_name || "Hotel booking"
-                              : `${bk.origin ?? ""} → ${bk.destination ?? ""}${bk.airline_code ? ` · ${bk.airline_code}` : ""}`}
-                          </p>
-                          <p className="text-[0.82rem] text-muted">
-                            {bk.kind === "hotel" ? (
-                              <>
-                                {bk.city ? `${bk.city} · ` : ""}
-                                {fmtDate(bk.check_in)} → {fmtDate(bk.check_out)}
-                                {bk.rooms ? ` · ${bk.rooms} room${bk.rooms > 1 ? "s" : ""}` : ""}
-                              </>
-                            ) : (
-                              <>{fmtDate(bk.depart_date)}</>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[0.82rem] font-bold tracking-wide text-navy">
-                          {bk.kind === "hotel" ? bk.confirmation_no || "—" : bk.pnr || "—"}
-                        </p>
-                        <p className="text-[0.78rem] text-muted">
-                          {bk.amount_paid_inr != null || bk.fare_inr != null
-                            ? `₹${inr.format(bk.amount_paid_inr ?? bk.fare_inr ?? 0)}`
-                            : ""}
-                        </p>
-                        {bk.kind === "hotel" && bk.status !== 6 && bk.booking_id != null && (
-                          <button
-                            onClick={() => cancelHotel(bk)}
-                            disabled={cancelling === bk.id}
-                            className="mt-1 py-2 text-[0.75rem] font-semibold text-red underline-offset-2 hover:underline disabled:opacity-60"
-                          >
-                            {cancelling === bk.id ? "Cancelling…" : "Cancel booking"}
-                          </button>
-                        )}
-                        {bk.status === 6 && (
-                          <p className="mt-1 text-[0.75rem] font-semibold text-muted">Cancellation requested</p>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  {upcoming.length > 0 && (
+                    <>
+                      <h3 className="mt-4 text-[0.78rem] font-bold uppercase tracking-wide text-muted">
+                        Upcoming
+                      </h3>
+                      <ul className="mt-2 space-y-3">{upcoming.map(renderBooking)}</ul>
+                    </>
+                  )}
+                  {past.length > 0 && (
+                    <>
+                      <h3 className="mt-6 text-[0.78rem] font-bold uppercase tracking-wide text-muted">
+                        Past
+                      </h3>
+                      <ul className="mt-2 space-y-3">{past.map(renderBooking)}</ul>
+                    </>
+                  )}
+                  <p className="mt-5 text-[0.78rem] text-muted">
+                    Tap a booking for its travellers, tickets and payment details. Need a
+                    change? Every booking has a help link — we handle changes personally.
+                  </p>
+                </>
               )}
             </div>
           </div>
