@@ -135,7 +135,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     fetch("/api/hotels/quote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookingCode: b.bookingCode }),
+      body: JSON.stringify({ bookingCode: b.bookingCode, ...(b.cc ? { destinationCountry: b.cc } : {}) }),
     })
       .then((r) => r.json())
       .then((j) => alive && setQuote(j as Quote))
@@ -143,7 +143,7 @@ export function HotelBookingForm({ b, contactEmail }: { b: Record<string, string
     return () => {
       alive = false;
     };
-  }, [b.bookingCode]);
+  }, [b.bookingCode, b.cc]);
 
   const v = quote?.validation;
   const money = useMemo(

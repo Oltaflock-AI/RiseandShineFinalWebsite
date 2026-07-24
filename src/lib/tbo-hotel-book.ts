@@ -1,9 +1,10 @@
 /**
  * TBO (TekTravels) Hotel API — BOOK + recovery. SERVER ONLY.
  *
- * The committing step of the hotel flow. Runs on the SAME host+creds as
- * Search/PreBook (affiliate.tektravels.com/HotelAPI + agency Basic auth) because
- * a `BookingCode` is scoped to the account that priced it. Docs:
+ * The committing step of the hotel flow. Same agency Basic auth as
+ * Search/PreBook, but on the HotelBE host — the docs' Book service URL is
+ * `HotelBE.tektravels.com/hotelservice.svc/rest/book` (verified live: posting
+ * Book to the affiliate Search/PreBook host 404s). Docs:
  * https://apidoc.tektravels.com/hotelnew
  *
  *   Flow (per booking): Search → PreBook → **Book** → GetBookingDetail
@@ -21,6 +22,9 @@ import { bookingCall, type HotelValidationInfo } from "./tbo-hotel";
 import { hotelBookingDetail } from "./tbo-hotel-post";
 
 const TIMEOUT_BOOK = 300_000; // Book may run long — never cut it short.
+
+/** Book's host — the HotelBE service base, same one the post-booking family uses. */
+const BOOK_BASE = (process.env.TBO_HOTEL_BE_URL || "https://HotelBE.tektravels.com/hotelservice.svc/rest").replace(/\/+$/, "");
 
 // ── request shapes ──
 export type HotelPassenger = {
@@ -124,6 +128,12 @@ function ip(): string {
  * booking can't be found / detail service is unreachable — the caller then
  * surfaces the "verify manually, do not retry" state.
  */
+/**
+ * Best-effort only: the GetBookingDetail docs mark ClientReferenceNo as
+ * "currently not in use" (verified live: the lookup 400s), so this usually
+ * resolves nothing and bookHotel falls through to its do-not-retry message.
+ * Kept because it is the only read-only probe we have if TBO enables it.
+ */
 async function recoverBookByReference(clientReferenceNo: string): Promise<HotelBookResult | null> {
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 10_000));
@@ -153,7 +163,22 @@ export async function bookHotel(req: HotelBookRequest): Promise<HotelBookResult>
   const ruleError = validateHotelPax(req);
   if (ruleError) return { ok: false, rule: true, error: ruleError };
 
-  const HotelRoomsDetails = req.rooms.map((room) => ({
+  // Children inherit their room lead's PAN when PAN is required — TBO's
+  // validation rules accept a parent/guardian PAN for guests without one, and
+  // (verified live) an international Book fails unless EVERY pax carries a PAN.
+  const roomsWithPan = req.validation?.panMandatory
+    ? req.rooms.map((room) => {
+        const guardian =
+          room.passengers.find((p) => p.leadPassenger)?.pan ?? room.passengers.find((p) => p.pan)?.pan;
+        return {
+          passengers: room.passengers.map((p) =>
+            p.paxType === 2 && !p.pan?.trim() && guardian ? { ...p, pan: guardian } : p,
+          ),
+        };
+      })
+    : req.rooms;
+
+  const HotelRoomsDetails = roomsWithPan.map((room) => ({
     HotelPassenger: room.passengers.map((p) => ({
       Title: p.title,
       FirstName: p.firstName.trim(),
@@ -195,7 +220,7 @@ export async function bookHotel(req: HotelBookRequest): Promise<HotelBookResult>
 
   let j: Resp;
   try {
-    j = await bookingCall<Resp>("Book", body, TIMEOUT_BOOK);
+    j = await bookingCall<Resp>("book", body, TIMEOUT_BOOK, BOOK_BASE);
   } catch (e) {
     // A timeout/network fault must NEVER trigger a re-book (double-book risk).
     // Instead, ask TBO read-only whether the booking exists — Book always carries

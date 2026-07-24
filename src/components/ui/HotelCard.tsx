@@ -33,6 +33,7 @@ export function HotelCard({
   adults,
   childAges,
   cityLabel,
+  countryCode,
   review,
   image,
   detailHref,
@@ -47,6 +48,8 @@ export function HotelCard({
   /** Ages of children per room (uniform occupancy), empty = adults only. */
   childAges?: number[];
   cityLabel: string;
+  /** Destination country (ISO-2) — carried to checkout to drive PAN rules. */
+  countryCode?: string;
   /** Google review score (absent → no badge). */
   review?: { rating: number; count: number };
   /** Lead photo from TBO HotelDetails (absent → placeholder block). */
@@ -78,6 +81,7 @@ export function HotelCard({
     room: cheapest?.name ?? "Room",
     meal: cheapest?.mealType ?? "",
     refundable: cheapest?.isRefundable ? "1" : "0",
+    ...(countryCode ? { cc: countryCode } : {}),
   };
 
   return (

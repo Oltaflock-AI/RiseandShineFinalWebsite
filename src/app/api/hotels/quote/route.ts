@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const limited = tooMany(req, "hotels-quote", 15);
   if (limited) return limited;
 
-  let body: { bookingCode?: string; paymentMode?: string };
+  let body: { bookingCode?: string; paymentMode?: string; destinationCountry?: string };
   try {
     body = await req.json();
   } catch {
@@ -29,5 +29,13 @@ export async function POST(req: Request) {
   }
 
   const result = await preBookHotel({ bookingCode: body.bookingCode, paymentMode: body.paymentMode });
+
+  // TBO enforces PAN on every international hotel Book even when the rate's
+  // ValidationInfo doesn't flag it (verified live during certification), so
+  // force the form to collect it whenever the destination is outside India.
+  const cc = body.destinationCountry?.trim().toUpperCase();
+  if (result.ok && cc && cc !== "IN" && result.validation && !result.validation.panMandatory) {
+    result.validation = { ...result.validation, panMandatory: true };
+  }
   return Response.json(result, { status: result.ok ? 200 : 502 });
 }

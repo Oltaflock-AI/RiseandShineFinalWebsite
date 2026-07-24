@@ -193,7 +193,7 @@ async function HotelResults({
   clearFiltersHref,
 }: {
   sp: Record<string, string | undefined>;
-  city: { label: string; cityCode: string };
+  city: { label: string; cityCode: string; countryCode: string };
   rooms: number;
   adultsPerRoom: number;
   childAges: number[];
@@ -335,6 +335,7 @@ async function HotelResults({
                   adults={adultsPerRoom}
                   childAges={childAges}
                   cityLabel={city.label}
+                  countryCode={city.countryCode}
                   initialSort={sp.sort}
                   initialMinStars={initialMinStars}
                 />

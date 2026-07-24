@@ -51,11 +51,12 @@ export async function bookingCall<T extends { Status?: TboStatus }>(
   method: string,
   body: Record<string, unknown>,
   timeoutMs = 60_000,
+  baseUrl?: string,
 ): Promise<T> {
   if (!hotelBookingConfigured()) {
     throw new TboHotelError("Hotel agency credentials are not configured.", -1);
   }
-  const url = `${cfg().base}/${method}`;
+  const url = `${(baseUrl ?? cfg().base).replace(/\/+$/, "")}/${method}`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   let res: Response;
@@ -250,17 +251,32 @@ export async function searchHotels(args: HotelSearchArgs): Promise<HotelSearchRe
     return fail(e instanceof TboHotelError ? e.message : "network");
   }
 
-  const offers: HotelOffer[] = (j.HotelResult ?? [])
-    .map((h) => {
-      const rooms = (h.Rooms ?? []).map(mapRoom).sort((a, b) => a.totalFare - b.totalFare);
-      return {
-        hotelCode: String(h.HotelCode ?? ""),
-        currency: h.Currency ?? "INR",
-        rooms,
-        cheapestFare: rooms[0]?.totalFare ?? 0,
-      };
+  // De-dupe — mandatory for TBO certification: the same hotel can come back
+  // more than once (multi-supplier inventory), so merge duplicate HotelCodes
+  // into one offer and collapse room options that are the same room + board at
+  // the same fare, keeping the cheapest set. A hotel is never rendered twice.
+  const byCode = new Map<string, { currency: string; rooms: HotelRoomOffer[] }>();
+  for (const h of j.HotelResult ?? []) {
+    const code = String(h.HotelCode ?? "");
+    const rooms = (h.Rooms ?? []).map(mapRoom);
+    if (!code || !rooms.length) continue;
+    const prev = byCode.get(code);
+    if (prev) prev.rooms.push(...rooms);
+    else byCode.set(code, { currency: h.Currency ?? "INR", rooms });
+  }
+  const offers: HotelOffer[] = [...byCode.entries()]
+    .map(([hotelCode, { currency, rooms }]) => {
+      const seen = new Set<string>();
+      const deduped = rooms
+        .sort((a, b) => a.totalFare - b.totalFare)
+        .filter((r) => {
+          const key = `${r.name}|${r.mealType ?? ""}|${r.inclusion ?? ""}|${Math.round(r.totalFare)}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      return { hotelCode, currency, rooms: deduped, cheapestFare: deduped[0]?.totalFare ?? 0 };
     })
-    .filter((o) => o.rooms.length)
     .sort((a, b) => a.cheapestFare - b.cheapestFare);
 
   const data: HotelSearchResult = {

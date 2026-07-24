@@ -189,6 +189,7 @@ export default async function HotelDetailPage({
                     code={code}
                     name={name}
                     cityLabel={cityLabel}
+                    countryCode={(sp.city && cityByCode(sp.city)?.countryCode) || ""}
                     checkIn={sp.checkIn!}
                     checkOut={sp.checkOut!}
                     nights={nights}
@@ -257,6 +258,7 @@ async function RoomOptions({
   code,
   name,
   cityLabel,
+  countryCode,
   checkIn,
   checkOut,
   nights,
@@ -267,6 +269,8 @@ async function RoomOptions({
   code: string;
   name: string;
   cityLabel: string;
+  /** Destination country (ISO-2) — carried to checkout to drive PAN rules. */
+  countryCode: string;
   checkIn: string;
   checkOut: string;
   nights: number;
@@ -335,6 +339,7 @@ async function RoomOptions({
                       room: room.name,
                       meal: room.mealType ?? "",
                       refundable: room.isRefundable ? "1" : "0",
+                      ...(countryCode ? { cc: countryCode } : {}),
                     };
                     return (
                       <div
