@@ -414,12 +414,15 @@ export function BookingForm({
   }
 
   if (booked?.ok) {
+    // Round-trip step 1: hand the customer straight to the return-leg checkout.
+    const nextLeg = b.next?.startsWith("/checkout?") ? b.next : undefined;
     return (
       <div className="mx-auto max-w-xl rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
         <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-red" aria-hidden />
-        <h2 className="h-sm mb-1">Ticket confirmed</h2>
+        <h2 className="h-sm mb-1">{nextLeg ? "Outbound ticket confirmed" : "Ticket confirmed"}</h2>
         <p className="mb-6 text-muted">
           {b.from} → {b.to} · {b.airline}
+          {nextLeg ? " · now book your return to complete the round trip" : ""}
         </p>
         <dl className="mx-auto mb-6 grid max-w-sm gap-2 text-left text-[0.9rem]">
           <div className="flex justify-between gap-4 border-b border-line pb-2">
@@ -441,9 +444,22 @@ export function BookingForm({
             </dd>
           </div>
         </dl>
-        <Button href="/account" arrow>
-          View my bookings
-        </Button>
+        <div className="flex flex-wrap justify-center gap-3">
+          {nextLeg ? (
+            <>
+              <Button href={nextLeg} arrow>
+                Book your return flight
+              </Button>
+              <Button href="/account" variant="light">
+                View my bookings
+              </Button>
+            </>
+          ) : (
+            <Button href="/account" arrow>
+              View my bookings
+            </Button>
+          )}
+        </div>
       </div>
     );
   }

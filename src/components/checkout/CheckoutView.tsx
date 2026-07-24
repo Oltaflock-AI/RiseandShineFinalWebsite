@@ -61,6 +61,11 @@ export function CheckoutView() {
             / <span className="text-white">Checkout</span>
           </nav>
           <h1 className="h-md text-white">Passenger details</h1>
+          {(b.leg === "out" || b.leg === "ret") && (
+            <p className="mt-3 inline-flex items-center rounded-full bg-white/10 px-3.5 py-1.5 text-[0.82rem] font-semibold text-white">
+              Round trip · {b.leg === "out" ? "Step 1 of 2 — outbound" : "Step 2 of 2 — return"}
+            </p>
+          )}
           <p className="mt-2 flex items-center gap-1.5 text-[0.9rem] text-white/75">
             <ShieldCheck size={15} aria-hidden /> Secure checkout · signed in as {user.email}
           </p>

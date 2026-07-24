@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Briefcase,
   Check,
@@ -14,10 +15,11 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { FlightCard, type BookingContext } from "./FlightCard";
+import { FlightCard, buildCheckoutQuery, type BookingContext } from "./FlightCard";
 import { CheckRow, DualRange, Section, SelectClear } from "./filter-controls";
 import type { FlightOffer } from "@/lib/tbo";
 import { site } from "@/data/site";
+import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
@@ -266,6 +268,27 @@ export function FlightResultsClient({
   const [showAirports, setShowAirports] = useState(false);
   const [showAllOut, setShowAllOut] = useState(false);
   const [showAllIn, setShowAllIn] = useState(false);
+
+  // ── round-trip pairing: pick one outbound + one return, book both guided ──
+  const router = useRouter();
+  const { user } = useAuth();
+  const [selOutId, setSelOutId] = useState<string | null>(null);
+  const [selInId, setSelInId] = useState<string | null>(null);
+  // Pairing needs a live TraceId (booking ctx) — otherwise Book itself can't run.
+  const pairing = trip === "round" && Boolean(booking) && Boolean(inbound?.length);
+  // Look up in the FULL lists so a selection survives filter changes.
+  const selOut = pairing ? outbound.find((o) => o.id === selOutId) : undefined;
+  const selIn = pairing ? (inbound ?? []).find((o) => o.id === selInId) : undefined;
+
+  const continuePair = () => {
+    if (!selOut || !selIn || !booking) return;
+    const retCtx = returnISO ? { ...booking, departISO: returnISO } : booking;
+    const retQuery = buildCheckoutQuery(selIn, waHref(selIn, adults), retCtx);
+    const retUrl = `/checkout?${new URLSearchParams({ ...retQuery, leg: "ret" }).toString()}`;
+    const outQuery = buildCheckoutQuery(selOut, waHref(selOut, adults), booking);
+    const url = `/checkout?${new URLSearchParams({ ...outQuery, leg: "out", next: retUrl }).toString()}`;
+    router.push(user ? url : `/login?redirect=${encodeURIComponent(url)}`);
+  };
 
   const [stops, setStops] = useState<Set<number>>(() => new Set([0, 1, 2]));
   const [airlines, setAirlines] = useState<Set<string>>(
@@ -730,7 +753,20 @@ export function FlightResultsClient({
           <>
             <div className="space-y-4">
               {outList.map((o) => (
-                <FlightCard key={o.id} offer={o} enquireHref={waHref(o, adults)} booking={booking} />
+                <FlightCard
+                  key={o.id}
+                  offer={o}
+                  enquireHref={waHref(o, adults)}
+                  booking={booking}
+                  selection={
+                    pairing
+                      ? {
+                          selected: selOutId === o.id,
+                          onSelect: () => setSelOutId((id) => (id === o.id ? null : o.id)),
+                        }
+                      : undefined
+                  }
+                />
               ))}
             </div>
             {shownOut.length > DISPLAY_CAP && !showAllOut && (
@@ -764,6 +800,14 @@ export function FlightResultsClient({
                       offer={o}
                       enquireHref={waHref(o, adults)}
                       booking={booking && returnISO ? { ...booking, departISO: returnISO } : booking}
+                      selection={
+                        pairing
+                          ? {
+                              selected: selInId === o.id,
+                              onSelect: () => setSelInId((id) => (id === o.id ? null : o.id)),
+                            }
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -790,6 +834,56 @@ export function FlightResultsClient({
           <b>Book</b> to confirm availability with our team.
         </p>
       </div>
+
+      {/* Round-trip pairing bar — appears once either leg is selected. */}
+      {pairing && (selOut || selIn) && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 shadow-[0_-4px_20px_rgba(8,50,73,0.12)] backdrop-blur">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-1">
+              <div className="min-w-0">
+                <div className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+                  Outbound
+                </div>
+                <div className="truncate text-[0.88rem] font-semibold text-ink">
+                  {selOut
+                    ? `${selOut.airlineName} · ${(selOut.segments[0]?.depTime || "").slice(11, 16)} · ₹${inr.format(selOut.fareINR)}`
+                    : "Choose an outbound flight"}
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+                  Return
+                </div>
+                <div className="truncate text-[0.88rem] font-semibold text-ink">
+                  {selIn
+                    ? `${selIn.airlineName} · ${(selIn.segments[0]?.depTime || "").slice(11, 16)} · ₹${inr.format(selIn.fareINR)}`
+                    : "Choose a return flight"}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              {selOut && selIn && (
+                <div className="text-right">
+                  <div className="text-[0.68rem] font-bold uppercase tracking-wide text-muted">
+                    Total / adult
+                  </div>
+                  <div className="text-[1.15rem] font-extrabold leading-tight text-navy">
+                    ₹{inr.format(selOut.fareINR + selIn.fareINR)}
+                  </div>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={continuePair}
+                disabled={!selOut || !selIn}
+                className="grad-red inline-flex min-h-11 items-center gap-1.5 rounded-full px-6 py-2.5 text-[0.9rem] font-semibold text-white shadow-brand-red transition-transform duration-300 hover:-translate-y-[2px] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+              >
+                Book both
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import Image from "next/image";
-import { Plane } from "lucide-react";
+import { CheckCircle2, Plane } from "lucide-react";
 import { airlineLogo } from "@/data/airlineLogos";
 import { BookButton } from "./BookButton";
 import type { FlightOffer } from "@/lib/tbo";
 import { formatDate } from "@/lib/format-date";
+import { cn } from "@/lib/cn";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 const fmtTime = (iso: string) => (iso || "").slice(11, 16);
@@ -22,14 +23,58 @@ export type BookingContext = {
   isInternational: boolean;
 };
 
+/**
+ * The /checkout query for one offer — shared by the card's Book button and the
+ * round-trip pairing bar so both open the identical checkout.
+ */
+export function buildCheckoutQuery(
+  offer: FlightOffer,
+  enquireHref: string,
+  booking?: BookingContext,
+): Record<string, string> {
+  const first = offer.segments[0];
+  const last = offer.segments[offer.segments.length - 1];
+  return {
+    airline: offer.airlineName,
+    flightNo: offer.segments.map((s) => s.flightNumber).join(" · "),
+    from: first?.from ?? "",
+    to: last?.to ?? "",
+    dep: first?.depTime ?? "",
+    arr: last?.arrTime ?? "",
+    stops: String(offer.stops),
+    dur: String(offer.durationMin),
+    fare: String(offer.fareINR),
+    refundable: offer.isRefundable ? "1" : "0",
+    wa: enquireHref,
+    // Everything below is what TBO needs to price and issue the ticket.
+    ...(booking
+      ? {
+          traceId: booking.traceId,
+          searchedAt: String(booking.searchedAt),
+          resultIndex: offer.id,
+          airlineCode: offer.airlineCode,
+          lcc: offer.isLCC ? "1" : "0",
+          depart: booking.departISO,
+          adults: String(booking.adults),
+          children: String(booking.children),
+          infants: String(booking.infants),
+          intl: booking.isInternational ? "1" : "0",
+        }
+      : {}),
+  };
+}
+
 export function FlightCard({
   offer,
   enquireHref,
   booking,
+  selection,
 }: {
   offer: FlightOffer;
   enquireHref: string;
   booking?: BookingContext;
+  /** Round-trip pairing: renders a Select toggle next to Book. */
+  selection?: { selected: boolean; onSelect: () => void };
 }) {
   const first = offer.segments[0];
   const last = offer.segments[offer.segments.length - 1];
@@ -96,36 +141,30 @@ export function FlightCard({
           </div>
           <div className="text-[0.68rem] text-muted">{fmtDate(first?.depTime)}</div>
         </div>
-        <BookButton
-          query={{
-            airline: offer.airlineName,
-            flightNo: offer.segments.map((s) => s.flightNumber).join(" · "),
-            from: first?.from ?? "",
-            to: last?.to ?? "",
-            dep: first?.depTime ?? "",
-            arr: last?.arrTime ?? "",
-            stops: String(offer.stops),
-            dur: String(offer.durationMin),
-            fare: String(offer.fareINR),
-            refundable: offer.isRefundable ? "1" : "0",
-            wa: enquireHref,
-            // Everything below is what TBO needs to price and issue the ticket.
-            ...(booking
-              ? {
-                  traceId: booking.traceId,
-                  searchedAt: String(booking.searchedAt),
-                  resultIndex: offer.id,
-                  airlineCode: offer.airlineCode,
-                  lcc: offer.isLCC ? "1" : "0",
-                  depart: booking.departISO,
-                  adults: String(booking.adults),
-                  children: String(booking.children),
-                  infants: String(booking.infants),
-                  intl: booking.isInternational ? "1" : "0",
-                }
-              : {}),
-          }}
-        />
+        <div className="flex flex-col items-end gap-2">
+          {selection && (
+            <button
+              type="button"
+              onClick={selection.onSelect}
+              aria-pressed={selection.selected}
+              className={cn(
+                "inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border-[1.6px] px-5 py-2.5 text-[0.85rem] font-semibold transition-colors",
+                selection.selected
+                  ? "border-red bg-red/10 text-red"
+                  : "border-line text-ink hover:border-red/60 hover:text-red",
+              )}
+            >
+              {selection.selected ? (
+                <>
+                  <CheckCircle2 size={16} aria-hidden /> Selected
+                </>
+              ) : (
+                "Select"
+              )}
+            </button>
+          )}
+          <BookButton query={buildCheckoutQuery(offer, enquireHref, booking)} />
+        </div>
       </div>
     </div>
   );
