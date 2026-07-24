@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BedDouble, Loader2, ShieldCheck, CalendarDays } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { AUTH_DISABLED } from "@/lib/flags";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { HotelBookingForm } from "./HotelBookingForm";
@@ -25,13 +26,13 @@ export function HotelCheckoutView() {
 
   // Login gate — this page is reachable directly, so guard it here too.
   useEffect(() => {
-    if (ready && !user) {
+    if (!AUTH_DISABLED && ready && !user) {
       const back = `/hotels/checkout${window.location.search}`;
       router.replace(`/login?redirect=${encodeURIComponent(back)}`);
     }
   }, [ready, user, router]);
 
-  if (!ready || !user || !b) {
+  if (!ready || (!AUTH_DISABLED && !user) || !b) {
     return (
       <div className="grid min-h-[70vh] place-items-center px-6 pt-24">
         <span className="inline-flex items-center gap-2 text-muted">
@@ -62,7 +63,7 @@ export function HotelCheckoutView() {
           </nav>
           <h1 className="h-md text-white">Guest details</h1>
           <p className="mt-2 flex items-center gap-1.5 text-[0.9rem] text-white/75">
-            <ShieldCheck size={15} aria-hidden /> Secure checkout · signed in as {user.email}
+            <ShieldCheck size={15} aria-hidden /> Secure checkout{user ? ` · signed in as ${user.email}` : ""}
           </p>
         </Container>
       </section>
@@ -99,7 +100,7 @@ export function HotelCheckoutView() {
           </div>
 
           {canBook ? (
-            <HotelBookingForm b={b} contactEmail={user.email} />
+            <HotelBookingForm b={b} contactEmail={user?.email ?? ""} />
           ) : (
             <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
               <h2 className="h-sm mb-2">This rate has expired</h2>

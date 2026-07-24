@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { trackEvent } from "@/lib/analytics";
 import { ArrowRight, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { AUTH_DISABLED } from "@/lib/flags";
 import { cn } from "@/lib/cn";
 
 /**
@@ -30,7 +31,7 @@ export function BookButton({
 
   const onClick = () => {
     trackEvent("checkout_opened", { kind: path.includes("hotel") ? "hotel" : "flight" });
-    if (user) router.push(checkout);
+    if (AUTH_DISABLED || user) router.push(checkout);
     else router.push(`/login?redirect=${encodeURIComponent(checkout)}`);
   };
 
@@ -42,9 +43,9 @@ export function BookButton({
         "grad-red inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full px-5 py-2.5 text-[0.85rem] font-semibold text-white shadow-brand-red transition-transform duration-300 hover:-translate-y-[2px]",
         className,
       )}
-      title={ready && !user ? "Log in or sign up to book" : undefined}
+      title={!AUTH_DISABLED && ready && !user ? "Log in or sign up to book" : undefined}
     >
-      {ready && !user && <Lock size={13} aria-hidden />}
+      {!AUTH_DISABLED && ready && !user && <Lock size={13} aria-hidden />}
       {label} <ArrowRight size={14} strokeWidth={2.2} aria-hidden />
     </button>
   );

@@ -64,6 +64,29 @@ describe("validatePax", () => {
     expect(() => validatePax([adult({ LastName: "Patel." })], ctx)).toThrow(/characters/);
   });
 
+  it("rejects names longer than 32 characters", () => {
+    expect(() => validatePax([adult({ FirstName: "A".repeat(33) })], ctx)).toThrow(/32/);
+    expect(() => validatePax([adult({ LastName: "B".repeat(33) })], ctx)).toThrow(/32/);
+  });
+
+  it("rejects a single-letter last name", () => {
+    expect(() => validatePax([adult({ LastName: "P" })], ctx)).toThrow(/2–32/);
+  });
+
+  it("rejects non-letter characters in names", () => {
+    expect(() => validatePax([adult({ FirstName: "R4j" })], ctx)).toThrow(/letters/i);
+    expect(() => validatePax([adult({ LastName: "O'Brien" })], ctx)).toThrow(/letters/i);
+  });
+
+  it("allows a 32-char first name and a 2-char last name", () => {
+    expect(() => validatePax([adult({ FirstName: "A".repeat(32), LastName: "Jo" })], ctx)).not.toThrow();
+  });
+
+  it("rejects a title used as a last name", () => {
+    expect(() => validatePax([adult({ LastName: "Mr" })], ctx)).toThrow(/title/i);
+    expect(() => validatePax([adult({ LastName: "Mrs" })], ctx)).toThrow(/title/i);
+  });
+
   it("requires a phone number on every pax", () => {
     expect(() => validatePax([adult({ ContactNo: "" })], ctx)).toThrow(/phone/i);
   });

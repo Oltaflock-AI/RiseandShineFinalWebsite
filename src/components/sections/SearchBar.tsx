@@ -244,8 +244,13 @@ export function SearchBar({
     return () => document.removeEventListener("mousedown", onClick);
   }, [paxOpen]);
 
+  // TBO checkpoint: total travellers (adults + children + infants) per journey ≤ 9.
+  const maxAdults = 9 - children - infants;
+  const maxChildren = 9 - adults - infants;
+  const maxInfants = Math.min(adults, 9 - adults - children); // also ≤ 1 per adult
+
   const setAdultsClamped = (n: number) => {
-    const a = Math.max(1, Math.min(9, n));
+    const a = Math.max(1, Math.min(maxAdults, n));
     setAdults(a);
     if (infants > a) setInfants(a); // 1 infant per adult, max
   };
@@ -405,9 +410,9 @@ export function SearchBar({
 
                     {paxOpen && (
                       <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 rounded-2xl border border-line bg-white p-4 shadow-brand lg:left-auto lg:right-0 lg:w-80">
-                        <Stepper label="Adults" sub="12+ years" value={adults} onChange={setAdultsClamped} min={1} max={9} />
-                        <Stepper label="Children" sub="2–12 years" value={children} onChange={(n) => setChildren(Math.max(0, Math.min(9, n)))} min={0} max={9} />
-                        <Stepper label="Infants" sub="Under 2 years" value={infants} onChange={(n) => setInfants(Math.max(0, Math.min(adults, n)))} min={0} max={adults} />
+                        <Stepper label="Adults" sub="12+ years" value={adults} onChange={setAdultsClamped} min={1} max={maxAdults} />
+                        <Stepper label="Children" sub="2–12 years" value={children} onChange={(n) => setChildren(Math.max(0, Math.min(maxChildren, n)))} min={0} max={maxChildren} />
+                        <Stepper label="Infants" sub="Under 2 years" value={infants} onChange={(n) => setInfants(Math.max(0, Math.min(maxInfants, n)))} min={0} max={maxInfants} />
                         <div className="mt-3 border-t border-line pt-3">
                           <div className="mb-2 text-[0.72rem] font-bold uppercase tracking-wide text-muted">Cabin class</div>
                           <div className="grid grid-cols-2 gap-2">

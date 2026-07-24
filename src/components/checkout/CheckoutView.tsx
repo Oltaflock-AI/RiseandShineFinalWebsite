@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MessageCircle, Plane, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { AUTH_DISABLED } from "@/lib/flags";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { PlaneLoader } from "@/components/ui/PlaneLoader";
@@ -27,13 +28,13 @@ export function CheckoutView() {
 
   // login gate — this page is reachable directly, so guard it here too
   useEffect(() => {
-    if (ready && !user) {
+    if (!AUTH_DISABLED && ready && !user) {
       const back = `/checkout${window.location.search}`;
       router.replace(`/login?redirect=${encodeURIComponent(back)}`);
     }
   }, [ready, user, router]);
 
-  if (!ready || !user || !b) {
+  if (!ready || (!AUTH_DISABLED && !user) || !b) {
     return (
       <div className="grid min-h-[70vh] place-items-center px-6 pt-24">
         <PlaneLoader message="Preparing your booking…" />
@@ -67,7 +68,7 @@ export function CheckoutView() {
             </p>
           )}
           <p className="mt-2 flex items-center gap-1.5 text-[0.9rem] text-white/75">
-            <ShieldCheck size={15} aria-hidden /> Secure checkout · signed in as {user.email}
+            <ShieldCheck size={15} aria-hidden /> Secure checkout{user ? ` · signed in as ${user.email}` : ""}
           </p>
         </Container>
       </section>
@@ -105,7 +106,7 @@ export function CheckoutView() {
           </div>
 
           {canBook ? (
-            <BookingForm b={b} contactEmail={user.email} />
+            <BookingForm b={b} contactEmail={user?.email ?? ""} />
           ) : (
             <div className="mx-auto max-w-lg rounded-brand-lg border border-line bg-white p-8 text-center shadow-brand-sm">
               <h2 className="h-sm mb-2">This fare has expired</h2>

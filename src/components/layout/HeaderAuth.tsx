@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LogOut, UserRound, LayoutGrid, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { AUTH_DISABLED } from "@/lib/flags";
 import { cn } from "@/lib/cn";
 
 const initial = (name: string) => (name.trim()[0] || "?").toUpperCase();
@@ -25,6 +26,7 @@ export function HeaderAuth({ scrolled }: { scrolled: boolean }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
 
+  if (AUTH_DISABLED) return null;
   if (!ready) return <span className="hidden h-9 w-24 lg:block" aria-hidden />;
 
   if (!user) {
@@ -97,7 +99,7 @@ export function HeaderAuth({ scrolled }: { scrolled: boolean }) {
 /** Mobile auth block inside the slide-out menu. */
 export function HeaderAuthMobile({ onNavigate }: { onNavigate: () => void }) {
   const { user, ready, logout } = useAuth();
-  if (!ready) return null;
+  if (AUTH_DISABLED || !ready) return null;
 
   if (!user) {
     return (

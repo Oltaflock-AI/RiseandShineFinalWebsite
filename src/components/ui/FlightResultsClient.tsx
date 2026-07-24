@@ -20,6 +20,7 @@ import { CheckRow, DualRange, Section, SelectClear } from "./filter-controls";
 import type { FlightOffer } from "@/lib/tbo";
 import { site } from "@/data/site";
 import { useAuth } from "@/lib/auth";
+import { AUTH_DISABLED } from "@/lib/flags";
 import { cn } from "@/lib/cn";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
@@ -287,7 +288,7 @@ export function FlightResultsClient({
     const retUrl = `/checkout?${new URLSearchParams({ ...retQuery, leg: "ret" }).toString()}`;
     const outQuery = buildCheckoutQuery(selOut, waHref(selOut, adults), booking);
     const url = `/checkout?${new URLSearchParams({ ...outQuery, leg: "out", next: retUrl }).toString()}`;
-    router.push(user ? url : `/login?redirect=${encodeURIComponent(url)}`);
+    router.push(AUTH_DISABLED || user ? url : `/login?redirect=${encodeURIComponent(url)}`);
   };
 
   const [stops, setStops] = useState<Set<number>>(() => new Set([0, 1, 2]));

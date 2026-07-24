@@ -106,6 +106,10 @@ export function normalizeTitle(title: string, paxType: PaxType, gender: 1 | 2): 
 
 /** Names may not contain . , / ( ) — TBO rejects them outright. */
 const BAD_NAME_CHARS = /[.,/()]/;
+/** TBO portal checkpoint: names are A–Z letters only (spaces allowed between parts). */
+const NAME_CHARS = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
+/** A last name must be a real surname, not a salutation ("Mr", "Ms."…). */
+const TITLE_WORDS = new Set(["MR", "MRS", "MS", "MSTR", "MISS", "MASTER", "DR"]);
 
 export function validatePax(pax: Pax[], ctx: { isLCC: boolean; airlineCode: string }): void {
   if (!pax.length) fail("pax", "At least one passenger is required.");
@@ -129,6 +133,18 @@ export function validatePax(pax: Pax[], ctx: { isLCC: boolean; airlineCode: stri
 
     if (BAD_NAME_CHARS.test(p.FirstName) || BAD_NAME_CHARS.test(p.LastName))
       fail("pax", `${who}: names cannot contain . , / ( ) characters.`);
+
+    // TBO portal checkpoint: first name 1–32 chars, last name 2–32 chars, A–Z only,
+    // and the last name may not itself be a title (e.g. "Mr", "Ms.").
+    const first = p.FirstName.trim();
+    const last = p.LastName.trim();
+    if (first.length > 32) fail("pax", `${who}: first name cannot exceed 32 characters.`);
+    if (last.length < 2 || last.length > 32)
+      fail("pax", `${who}: last name must be 2–32 characters.`);
+    if (!NAME_CHARS.test(first) || !NAME_CHARS.test(last))
+      fail("pax", `${who}: names may only contain letters A–Z.`);
+    if (TITLE_WORDS.has(last.toUpperCase()))
+      fail("pax", `${who}: last name cannot be a title like Mr/Mrs/Ms.`);
 
     // DOB mandatory for child + infant (and for AirAsia adults too)
     if ((p.PaxType === 2 || p.PaxType === 3) && !p.DateOfBirth)

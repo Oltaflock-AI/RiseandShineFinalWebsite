@@ -200,7 +200,7 @@ export function BookingForm({
     if (!contact.phone.trim() || !contact.email.trim() || !contact.address.trim()) return false;
     if (needGst && (!gst.GSTNumber.trim() || !gst.GSTCompanyName.trim())) return false;
     return pax.every((p) => {
-      if (!p.FirstName.trim() || !p.LastName.trim()) return false;
+      if (!p.FirstName.trim() || p.LastName.trim().length < 2) return false;
       if ((p.PaxType === 2 || p.PaxType === 3) && !p.DateOfBirth) return false;
       if (needPassport && (!p.PassportNo.trim() || !p.PassportExpiry)) return false;
       if (needFullPassport && !p.PassportIssueDate) return false;
@@ -500,7 +500,8 @@ export function BookingForm({
                 <input
                   className={field}
                   value={p.FirstName}
-                  onChange={(e) => set(i, "FirstName", e.target.value)}
+                  maxLength={32}
+                  onChange={(e) => set(i, "FirstName", e.target.value.replace(/[^A-Za-z ]/g, ""))}
                   placeholder="As on ID"
                 />
               </div>
@@ -509,8 +510,10 @@ export function BookingForm({
                 <input
                   className={field}
                   value={p.LastName}
-                  onChange={(e) => set(i, "LastName", e.target.value)}
-                  placeholder="As on ID"
+                  maxLength={32}
+                  minLength={2}
+                  onChange={(e) => set(i, "LastName", e.target.value.replace(/[^A-Za-z ]/g, ""))}
+                  placeholder="As on ID (min 2 letters, no title)"
                 />
               </div>
             </div>
@@ -592,13 +595,15 @@ export function BookingForm({
                       <input
                         className={field}
                         value={p.GuardianFirstName}
-                        onChange={(e) => set(i, "GuardianFirstName", e.target.value)}
+                        maxLength={32}
+                        onChange={(e) => set(i, "GuardianFirstName", e.target.value.replace(/[^A-Za-z ]/g, ""))}
                         placeholder="Guardian first name"
                       />
                       <input
                         className={field}
                         value={p.GuardianLastName}
-                        onChange={(e) => set(i, "GuardianLastName", e.target.value)}
+                        maxLength={32}
+                        onChange={(e) => set(i, "GuardianLastName", e.target.value.replace(/[^A-Za-z ]/g, ""))}
                         placeholder="Guardian last name"
                       />
                       <input

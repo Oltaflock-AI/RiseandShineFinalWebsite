@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { AuthScreen } from "@/components/auth/AuthScreen";
+import { AUTH_DISABLED } from "@/lib/flags";
 
 export const metadata: Metadata = {
   title: "Sign up",
@@ -8,5 +10,6 @@ export const metadata: Metadata = {
 };
 
 export default function SignupPage() {
+  if (AUTH_DISABLED) redirect("/");
   return <AuthScreen mode="signup" />;
 }
