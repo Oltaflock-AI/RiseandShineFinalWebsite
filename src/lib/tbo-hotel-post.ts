@@ -19,6 +19,7 @@ import "server-only";
  */
 import { getAuthToken } from "./tbo";
 import { TboHotelError } from "./tbo-hotel-static";
+import { tboFetch } from "./tbo-fetch";
 
 const BASE = (process.env.TBO_HOTEL_BE_URL || "https://HotelBE.tektravels.com/hotelservice.svc/rest").replace(/\/+$/, "");
 const TOKEN_INVALID = 6;
@@ -33,7 +34,7 @@ async function post(method: string, body: Json, timeoutMs = 30_000): Promise<Jso
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const r = await fetch(`${BASE}/${method}`, {
+    const r = await tboFetch(`${BASE}/${method}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept-Encoding": "gzip" },
       body: JSON.stringify(body),

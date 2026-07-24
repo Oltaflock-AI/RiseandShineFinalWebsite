@@ -10,6 +10,7 @@
  * (certification pending) — we surface live search fares with an enquiry CTA.
  */
 import { TboValidationError, validateSearch } from "./tbo-validate";
+import { tboFetch } from "./tbo-fetch";
 
 const AUTH_URL =
   "http://Sharedapi.tektravels.com/SharedData.svc/rest/Authenticate";
@@ -95,7 +96,7 @@ async function authenticate(force = false): Promise<string | null> {
   if (!tboConfigured()) return null;
   const c = cfg();
   try {
-    const r = await fetch(AUTH_URL, {
+    const r = await tboFetch(AUTH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -260,6 +261,10 @@ type RawSearchOpts = {
   cabinCode: string;
   directOnly: boolean;
   preferredAirlines: string[] | null;
+  /** TBO Special Return (JourneyType 5): paired discounted round-trip fares. */
+  specialReturn: boolean;
+  /** Supplier sources (e.g. ["SG"]). Special Return allows only ONE source. */
+  sources: string[] | null;
 };
 
 async function rawSearch(token: string, o: RawSearchOpts) {
@@ -280,10 +285,10 @@ async function rawSearch(token: string, o: RawSearchOpts) {
     InfantCount: String(o.infants),
     DirectFlight: o.directOnly ? "true" : "false",
     OneStopFlight: "false",
-    JourneyType: o.returnISO ? "2" : "1",
+    JourneyType: o.specialReturn && o.returnISO ? "5" : o.returnISO ? "2" : "1",
     PreferredAirlines: o.preferredAirlines,
     Segments: segments,
-    Sources: null,
+    Sources: o.sources,
   };
   // Reject a bad search here rather than at the supplier (TBO checklist: Search Method Validation).
   validateSearch(body);
@@ -292,7 +297,7 @@ async function rawSearch(token: string, o: RawSearchOpts) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 60_000);
   try {
-    const r = await fetch(SEARCH_URL, {
+    const r = await tboFetch(SEARCH_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -307,6 +312,15 @@ async function rawSearch(token: string, o: RawSearchOpts) {
 
 // ── result cache (in-memory, per route+date+pax) ──
 const searchCache = new Map<string, { data: FlightSearch; exp: number }>();
+
+/**
+ * Drop all cached search results. Needed when a TraceId has been CONSUMED by a
+ * booking ("expires after booking") and the same route/date/pax must be
+ * re-searched for a fresh one — the cache would otherwise serve the dead trace.
+ */
+export function clearFlightSearchCache(): void {
+  searchCache.clear();
+}
 /**
  * Under TBO's 15-minute TraceId window — a cached result carries its TraceId, and
  * serving one past expiry would fail at FareQuote/Book with "session expired".
@@ -327,6 +341,10 @@ export type SearchArgs = {
   directOnly?: boolean;
   /** Restrict to specific airline codes (e.g. ["6E"]); null/undefined = all. */
   preferredAirlines?: string[];
+  /** Search TBO Special Return fares (JourneyType 5) — requires returnISO. */
+  specialReturn?: boolean;
+  /** Supplier sources (e.g. ["SG"]); Special Return accepts a single source only. */
+  sources?: string[];
 };
 
 export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
@@ -337,6 +355,8 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
   const infants = Math.max(0, args.infants ?? 0);
   const cabinCode = CABIN_CODE[args.cabin ?? ""] ?? "1";
   const directOnly = Boolean(args.directOnly);
+  const specialReturn = Boolean(args.specialReturn && args.returnISO);
+  const sources = args.sources && args.sources.length ? args.sources : null;
   const preferredAirlines =
     args.preferredAirlines && args.preferredAirlines.length ? args.preferredAirlines : null;
   const base: Omit<FlightSearch, "ok" | "source" | "outbound"> = {
@@ -346,7 +366,7 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
     returnISO: args.returnISO,
     adults,
   };
-  const key = `${from}|${to}|${args.departISO}|${args.returnISO ?? ""}|${adults}|${children}|${infants}|${cabinCode}|${directOnly ? "D" : ""}|${preferredAirlines?.join(",") ?? ""}`;
+  const key = `${from}|${to}|${args.departISO}|${args.returnISO ?? ""}|${adults}|${children}|${infants}|${cabinCode}|${directOnly ? "D" : ""}|${specialReturn ? "SR" : ""}|${sources?.join(",") ?? ""}|${preferredAirlines?.join(",") ?? ""}`;
   const hit = searchCache.get(key);
   if (hit && hit.exp > Date.now()) return hit.data;
 
@@ -361,6 +381,8 @@ export async function searchFlights(args: SearchArgs): Promise<FlightSearch> {
     cabinCode,
     directOnly,
     preferredAirlines,
+    specialReturn,
+    sources,
   };
 
   const fail = (error: string): FlightSearch => ({

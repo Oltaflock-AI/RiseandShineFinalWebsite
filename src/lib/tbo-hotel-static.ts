@@ -17,6 +17,7 @@
  *   TBO_HOTEL_STATIC_USERNAME  static-data username
  *   TBO_HOTEL_STATIC_PASSWORD  static-data password
  */
+import { tboFetch } from "./tbo-fetch";
 
 const DEFAULT_BASE = "http://api.tbotechnology.in/TBOHolidays_HotelAPI";
 
@@ -70,7 +71,7 @@ async function call<T extends { Status?: TboStatus }>(
   const t = setTimeout(() => ctl.abort(), 30_000);
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await tboFetch(url, {
       method: body ? "POST" : "GET",
       headers: {
         Authorization: authHeader(),

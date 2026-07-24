@@ -12,6 +12,7 @@
  *
  * Reference: https://apidoc.tektravels.com/flight/apivalidation.aspx
  */
+import { tboFetch } from "./tbo-fetch";
 import {
   type FareBreakdown,
   type FareQuoteFlags,
@@ -122,7 +123,7 @@ async function post(url: string, body: Json, timeoutMs: number): Promise<Json> {
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   let text: string;
   try {
-    const r = await fetch(url, {
+    const r = await tboFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -342,6 +343,12 @@ export async function quoteFare(args: {
 
 type PreparedBooking = {
   passengers: Pax[];
+  /**
+   * ResultIndex to Book/Ticket with. FareQuote can REPLACE the searched index —
+   * notably Special Return, where quoting "OBx,IBy" returns one merged index that
+   * is the only one Ticket accepts.
+   */
+  resultIndex: string;
   dupKey: string;
   priceChanged: boolean;
   newFare?: number;
@@ -370,6 +377,7 @@ async function prepareBooking(req: BookingRequest): Promise<PreparedBooking> {
   const FQ = assertOk(fqRes, "FareQuote");
   const quoted = (Array.isArray(FQ.Results) ? FQ.Results[0] : FQ.Results) as Json;
   if (!quoted) throw new TboError("FareQuote returned no result — the fare is no longer available.");
+  const resultIndex = (quoted.ResultIndex as string | undefined) || req.resultIndex;
 
   const flags: FareQuoteFlags = {
     IsPanRequiredAtBook: quoted.IsPanRequiredAtBook,
@@ -430,7 +438,7 @@ async function prepareBooking(req: BookingRequest): Promise<PreparedBooking> {
   });
   assertNotDuplicate(dupKey, req.isLCC);
 
-  return { passengers, dupKey, priceChanged, newFare, publishedFare: newFare };
+  return { passengers, resultIndex, dupKey, priceChanged, newFare, publishedFare: newFare };
 }
 
 export type ValidateResult =
@@ -457,7 +465,7 @@ export async function validateBooking(req: BookingRequest): Promise<ValidateResu
 export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
   try {
     // Re-run all pre-ticket checks (parity with the pre-charge validation) then ticket.
-    const { passengers, dupKey, priceChanged, newFare } = await prepareBooking(req);
+    const { passengers, resultIndex, dupKey, priceChanged, newFare } = await prepareBooking(req);
 
     let bookingId: number | undefined;
     let pnr: string | undefined;
@@ -468,7 +476,7 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
       try {
         res = await bookCall(
           "Ticket",
-          { TraceId: req.traceId, ResultIndex: req.resultIndex, Passengers: passengers, IsPriceChangeAccepted: true },
+          { TraceId: req.traceId, ResultIndex: resultIndex, Passengers: passengers, IsPriceChangeAccepted: true },
           TIMEOUT_BOOK,
         );
       } catch (e) {
@@ -486,7 +494,7 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
       try {
         bookRes = await bookCall(
           "Book",
-          { TraceId: req.traceId, ResultIndex: req.resultIndex, Passengers: passengers },
+          { TraceId: req.traceId, ResultIndex: resultIndex, Passengers: passengers },
           TIMEOUT_BOOK,
         );
       } catch (e) {
@@ -513,7 +521,22 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
         if (!rec) throw new TboError("Ticket timed out. Check the booking queue before retrying — do not re-ticket.");
         tktRes = { Response: rec };
       }
-      let T = assertOk(tktRes, "Ticket");
+      // A Ticket failure AFTER a successful Book leaves a HELD booking at TBO —
+      // surface the PNR/BookingId so ops can ticket it from the queue instead of
+      // the hold silently vanishing behind a generic error.
+      const heldResult = (e: TboError): BookingResult => ({
+        ok: false,
+        pnr,
+        bookingId,
+        error: `Ticketing failed after Book — the booking is HELD at TBO (PNR ${pnr}, BookingId ${bookingId}). ${e.message}`,
+      });
+      let T: Json;
+      try {
+        T = assertOk(tktRes, "Ticket");
+      } catch (e) {
+        if (e instanceof TboError) return heldResult(e);
+        throw e;
+      }
 
       // Ticket itself reported a price change → call Ticket again, accepting it.
       if (T.Response?.IsPriceChanged) {
@@ -522,7 +545,12 @@ export async function bookFlight(req: BookingRequest): Promise<BookingResult> {
           { TraceId: req.traceId, PNR: pnr, BookingId: bookingId, IsPriceChangeAccepted: true },
           TIMEOUT_BOOK,
         );
-        T = assertOk(retry, "Ticket (price change accepted)");
+        try {
+          T = assertOk(retry, "Ticket (price change accepted)");
+        } catch (e) {
+          if (e instanceof TboError) return heldResult(e);
+          throw e;
+        }
       }
     }
 

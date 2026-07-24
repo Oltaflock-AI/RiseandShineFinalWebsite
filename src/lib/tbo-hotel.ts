@@ -17,6 +17,7 @@
  * TBO_USERNAME/PASSWORD), TBO_END_USER_IP.
  */
 import { TboHotelError } from "./tbo-hotel-static";
+import { tboFetch } from "./tbo-fetch";
 
 const DEFAULT_BASE = "https://affiliate.tektravels.com/HotelAPI";
 
@@ -61,7 +62,7 @@ export async function bookingCall<T extends { Status?: TboStatus }>(
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await tboFetch(url, {
       method: "POST",
       headers: {
         Authorization: authHeader(),
